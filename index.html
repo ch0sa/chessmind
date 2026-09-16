@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>ChessMind - Modern Offline Chess Analysis</title>
+    <meta name="description" content="Free offline chess analysis powered by Stockfish WASM. Manual piece placement, push-to-talk voice commands, and zero ads.">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#0d1117">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>♞</text></svg>">
+
+    <!-- Chessground CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/chessground@9.1.1/assets/chessground.base.css">
+    <link rel="stylesheet" href="https://unpkg.com/chessground@9.1.1/assets/chessground.brown.css">
+    <link rel="stylesheet" href="https://unpkg.com/chessground@9.1.1/assets/chessground.cburnett.css">
+    
+    <!-- Modern App CSS -->
+    <link rel="stylesheet" href="css/app.css?v=9">
+    
+    <!-- Service Worker Registration -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('./sw.js?v=9')
+            .then(reg => console.log('SW registered:', reg.scope))
+            .catch(err => console.warn('SW registration failed:', err));
+        });
+      }
+    </script>
+</head>
+<body data-mode="analysis">
+    <noscript>
+        <div style="padding: 20px; text-align: center; color: #fff;">
+            ChessMind requires JavaScript to run the offline chess engine. Please enable JavaScript.
+        </div>
+    </noscript>
+
+    <div class="app-wrapper">
+        <!-- App Header -->
+        <header class="app-header">
+            <div class="brand">
+                <span class="brand-icon">♞</span>
+                <span class="brand-title">ChessMind</span>
+                <div class="engine-status-badge">
+                    <span id="status-dot" class="status-dot"></span>
+                    <span id="engine-status-text">Stockfish</span>
+                </div>
+            </div>
+
+            <div class="header-actions">
+                <button id="tts-toggle-btn" class="icon-btn" title="Toggle Speech (TTS)" aria-label="Toggle speech" data-action="toggle-tts">🔊</button>
+                <button id="flip-board-btn" class="icon-btn" title="Flip Board" aria-label="Flip board" data-action="flip-board">🔄</button>
+                <button id="help-btn" class="icon-btn" title="User Guide" aria-label="Open User Guide" data-action="open-help">❓</button>
+                <button id="settings-btn" class="icon-btn" title="Settings" aria-label="Open Settings" data-action="open-settings">⚙️</button>
+            </div>
+        </header>
+
+        <!-- Main Workspace (Unified Single Screen) -->
+        <main class="app-content single-screen-layout">
+            <!-- 1. The Chessboard & HUD -->
+            <section class="board-container-card">
+                <div class="board-wrapper">
+                    <!-- Integrated Left Edge Eval Gauge -->
+                    <div id="eval-bar" class="eval-gauge" aria-hidden="true">
+                        <div id="eval-fill" class="eval-gauge-fill"></div>
+                    </div>
+                    <!-- Chessground Mount -->
+                    <div id="board" class="cg-board-wrap"></div>
+                </div>
+
+                <!-- Instant Engine HUD Strip (Directly Below Board) -->
+                <div class="engine-hud" role="region" aria-label="Engine Evaluation Summary">
+                    <div class="hud-left">
+                        <span id="eval-score" class="hud-eval-badge">0.0</span>
+                        <div class="hud-best-move">
+                            <span class="icon">⚡</span>
+                            <span id="best-move">Best: --</span>
+                        </div>
+                    </div>
+                    <div class="hud-right">
+                        <span id="depth-display" class="hud-pill-btn">Depth: 15</span>
+                        <button id="analyze-btn" class="hud-pill-btn active" data-action="start-analysis" title="Toggle calculation">⚡ Analyze</button>
+                        <button id="stop-btn" class="hud-pill-btn" data-action="stop-analysis" style="display: none; color: var(--accent-red);">⏹ Stop</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 2. Controls & Actions Section -->
+            <section class="unified-controls-card">
+                <!-- 1-Click Action Buttons -->
+                <div class="quick-actions-bar">
+                    <button id="clear-board-btn" class="action-btn btn-danger" data-action="clear-board" title="Wipe all pieces from the board">
+                        🗑️ Clear Board
+                    </button>
+                    <button id="start-pos-btn" class="action-btn" data-action="start-pos" title="Reset standard 32 pieces">
+                        🔄 Starting Position
+                    </button>
+                    <button id="free-mode-btn" class="action-btn toggle-free" title="Toggle standard rules vs free piece placement">
+                        ✋ Free Move: OFF
+                    </button>
+                </div>
+
+                <!-- Unified Piece Palette Tray (Tap piece -> Tap square to place) -->
+                <div class="piece-palette-deck" aria-label="Piece Palette">
+                    <div class="palette-row">
+                        <button class="palette-item" data-color="white" data-role="king" title="White King">♔</button>
+                        <button class="palette-item" data-color="white" data-role="queen" title="White Queen">♕</button>
+                        <button class="palette-item" data-color="white" data-role="rook" title="White Rook">♖</button>
+                        <button class="palette-item" data-color="white" data-role="bishop" title="White Bishop">♗</button>
+                        <button class="palette-item" data-color="white" data-role="knight" title="White Knight">♘</button>
+                        <button class="palette-item" data-color="white" data-role="pawn" title="White Pawn">♙</button>
+                    </div>
+                    <div class="palette-row">
+                        <button class="palette-item" data-color="black" data-role="king" title="Black King">♚</button>
+                        <button class="palette-item" data-color="black" data-role="queen" title="Black Queen">♛</button>
+                        <button class="palette-item" data-color="black" data-role="rook" title="Black Rook">♜</button>
+                        <button class="palette-item" data-color="black" data-role="bishop" title="Black Bishop">♝</button>
+                        <button class="palette-item" data-color="black" data-role="knight" title="Black Knight">♞</button>
+                        <button class="palette-item" data-color="black" data-role="pawn" title="Black Pawn">♟</button>
+                        <button class="palette-item palette-trash" data-action="trash" title="Trash: tap any piece on the board to delete">🗑️</button>
+                    </div>
+                </div>
+
+                <!-- Voice & Type Bar -->
+                <div class="voice-type-bar">
+                    <div class="type-input-group">
+                        <input type="text" id="command-input" class="text-command-input" 
+                               placeholder="Move e.g. 'Knight to e5', 'c2 to c5', 'e4'..." 
+                               aria-label="Text move command input" autocomplete="off" />
+                        <button id="command-submit-btn" class="btn-submit-move">Move</button>
+                    </div>
+                    <button id="ptt-btn" class="ptt-large-btn" title="Press and hold down to speak move">
+                        <span class="icon">🎙️</span>
+                        <span class="label">Hold to Speak Move</span>
+                    </button>
+                </div>
+
+                <!-- Top Engine Lines (Candidate Moves) -->
+                <div class="candidate-moves-panel">
+                    <div class="candidate-header">
+                        <span>Top Engine Lines</span>
+                        <span id="pv-line" class="pv-snippet">--</span>
+                    </div>
+                    <ul id="candidate-moves" class="candidate-list" aria-label="Top Candidate Moves">
+                        <li class="candidate-item" style="color: var(--text-muted); justify-content: center;">
+                            Evaluating position...
+                        </li>
+                    </ul>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Hidden compatibility bridges -->
+    <div style="display: none;">
+        <button id="mode-toggle-btn">Setup</button>
+        <button id="voice-btn">Voice</button>
+        <button id="tts-btn">TTS</button>
+        <button id="help-tool-btn">Guide</button>
+        <select id="voice-engine"><option value="web-speech">Web</option></select>
+        <input type="checkbox" id="lite-mode">
+    </div>
+
+    <!-- Help & Guide Modal -->
+    <div id="help-modal" class="modal-backdrop hidden" role="dialog" aria-labelledby="guide-title">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h2 id="guide-title">📖 ChessMind Quick Guide</h2>
+                <button id="close-help" class="close-btn" aria-label="Close guide">&times;</button>
+            </div>
+            
+            <div class="modal-body">
+                <section class="guide-section">
+                    <h3>⚡ 1-Click Instant Analysis</h3>
+                    <p>ChessMind runs a 100% offline, native WebAssembly Stockfish engine inside your browser. No ads, no lag.</p>
+                    <ul>
+                        <li><strong>Auto-Analysis:</strong> Move any piece on the board and Stockfish automatically evaluates the new position.</li>
+                        <li><strong>Green Arrow:</strong> Directly points to the engine's best move.</li>
+                        <li><strong>Eval Score:</strong> <code>+0.8</code> means White has advantage. <code>-0.8</code> means Black has advantage.</li>
+                    </ul>
+                </section>
+
+                <section class="guide-section">
+                    <h3>✋ Free Piece Placement (Place Any Piece Anywhere)</h3>
+                    <p>Want to set up custom puzzles or position pieces freely without chess turn rules?</p>
+                    <ul>
+                        <li>Click <strong>✋ Free Move: ON</strong> to drag any piece to any square without restrictions!</li>
+                        <li><strong>Piece Tray:</strong> Tap any piece in the tray below the board (e.g. ♘ or ♛), then tap any square to drop it.</li>
+                        <li><strong>Delete Pieces:</strong> Tap the 🗑️ trash icon, then tap a piece on the board to remove it.</li>
+                        <li><strong>1-Click Reset & Clear:</strong> Tap <strong>Clear Board</strong> to wipe all pieces, or <strong>Starting Position</strong> to reset standard 32 pieces instantly.</li>
+                    </ul>
+                </section>
+
+                <section class="guide-section">
+                    <h3>🎙️ Voice Commands & Press-to-Hold</h3>
+                    <p>Press and hold the <strong>🎙️ Hold to Speak</strong> button, speak your move, and release!</p>
+                    <table class="guide-table">
+                        <thead>
+                            <tr><th>Say</th><th>Action</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>"White Knight to e5"</code></td><td>Places/moves white knight to e5</td></tr>
+                            <tr><td><code>"Black Queen to f6"</code></td><td>Places/moves black queen to f6</td></tr>
+                            <tr><td><code>"c2 to c5"</code></td><td>Moves piece from c2 to c5</td></tr>
+                            <tr><td><code>"Knight to e7"</code> / <code>"e4"</code></td><td>Standard move</td></tr>
+                            <tr><td><code>"Remove e4"</code></td><td>Clears piece from square</td></tr>
+                            <tr><td><code>"Analyze"</code> / <code>"Flip"</code></td><td>Engine & board controls</td></tr>
+                        </tbody>
+                    </table>
+                    <p style="margin-top: 6px; font-size: 0.78rem; color: var(--text-muted);"><em>Random speech or background noise is safely ignored.</em></p>
+                </section>
+
+                <section class="guide-section">
+                    <h3>⌨️ Text Input Box</h3>
+                    <p>You can also type any of the above commands into the input box and click <strong>Move</strong> or press <kbd>Enter</kbd>.</p>
+                </section>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="modal-backdrop hidden" role="dialog" aria-labelledby="settings-title">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h2 id="settings-title">⚙️ Settings</h2>
+                <button id="close-settings" class="close-btn" aria-label="Close settings">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="settings-form">
+                    <div class="setting-row">
+                        <label for="theme-toggle">Theme</label>
+                        <select id="theme-toggle" data-setting="theme">
+                            <option value="dark">Dark (Default)</option>
+                            <option value="light">Light</option>
+                        </select>
+                    </div>
+                    <div class="setting-row">
+                        <label for="multipv-count">Candidate Lines (Multi-PV)</label>
+                        <input type="number" id="multipv-count" min="1" max="5" value="3" data-setting="multipv">
+                    </div>
+                    <div class="setting-row">
+                        <label for="tts-speed">TTS Speech Speed</label>
+                        <input type="range" id="tts-speed" min="0.5" max="2.0" step="0.1" value="1.0" data-setting="tts-speed">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Live Transcripts and Notifications -->
+    <div id="voice-feedback" style="display: none;"></div>
+    <div id="toast-container" class="toast-container" aria-live="polite"></div>
+
+    <!-- App Module Scripts -->
+    <script type="module" src="./js/app.js"></script>
+</body>
+</html>
