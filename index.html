@@ -15,13 +15,13 @@
     <link rel="stylesheet" href="https://unpkg.com/chessground@9.1.1/assets/chessground.cburnett.css">
     
     <!-- Modern App CSS -->
-    <link rel="stylesheet" href="css/app.css?v=9">
+    <link rel="stylesheet" href="css/app.css?v=10">
     
     <!-- Service Worker Registration -->
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('./sw.js?v=9')
+          navigator.serviceWorker.register('./sw.js?v=10')
             .then(reg => console.log('SW registered:', reg.scope))
             .catch(err => console.warn('SW registration failed:', err));
         });

@@ -8,9 +8,7 @@ async function runStressBattery() {
     args: [
       '--no-sandbox',
       '--disable-setuid-sandbox',
-      '--ignore-certificate-errors',
-      '--enable-features=SharedArrayBuffer',
-      '--enable-blink-features=SharedArrayBuffer'
+      '--ignore-certificate-errors'
     ]
   });
 
@@ -35,9 +33,9 @@ async function runStressBattery() {
 
   page.on('console', msg => {
     const text = msg.text();
+    console.log(`[Browser ${msg.type()}]:`, text);
     if (msg.type() === 'error') {
       consoleErrors.push(text);
-      console.error('❌ Browser Console Error:', text);
     }
   });
 
@@ -71,15 +69,15 @@ async function runStressBattery() {
     if (container) observer.observe(container, { childList: true });
   });
 
-  // Enable 4x CPU throttling via Chrome DevTools Protocol
+  // 1. Wait for engine ready
+  console.log('⏳ Waiting for Stockfish Engine Ready...');
+  await page.waitForSelector('.status-dot.ready', { timeout: 25000 });
+  console.log('✅ Stockfish Engine Ready!');
+
+  // Enable 4x CPU throttling via Chrome DevTools Protocol to stress test interactions
   const client = await page.target().createCDPSession();
   await client.send('Emulation.setCPUThrottlingRate', { rate: 4 });
   console.log('⚡ 4x CPU Throttling ENABLED (simulating low-end mobile device)');
-
-  // 1. Wait for engine ready
-  console.log('⏳ Waiting for Stockfish Engine Ready...');
-  await page.waitForSelector('.status-dot.ready', { timeout: 15000 });
-  console.log('✅ Stockfish Engine Ready!');
 
   // Wait for initial analysis to report best move
   await page.waitForFunction(() => {

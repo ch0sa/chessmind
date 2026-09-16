@@ -561,7 +561,7 @@ function updateAnalysisUI(result) {
 
   // Update status badge
   if (els.statusDot) els.statusDot.classList.add('ready');
-  if (els.engineStatusText) els.engineStatusText.textContent = 'Stockfish 16';
+  if (els.engineStatusText) els.engineStatusText.textContent = 'Stockfish Ready ⚡';
   
   // Update PV line
   if (result.lines && result.lines[0] && result.lines[0].pv && els.pvLine) {
@@ -1142,9 +1142,17 @@ async function init() {
       piecesPaletteElement: document.querySelector('.piece-palette')
     });
     // 4. Initialize Stockfish Engine
+    if (els.engineStatusText) els.engineStatusText.textContent = 'Loading...';
     initEngine({
       onReady: () => {
         state.engineReady = true;
+        if (els.statusDot) {
+          els.statusDot.classList.remove('error');
+          els.statusDot.classList.add('ready');
+        }
+        if (els.engineStatusText) {
+          els.engineStatusText.textContent = 'Stockfish Ready ⚡';
+        }
         showToast('Stockfish Engine Ready ⚡', 'success', 2000);
         if (state.mode === 'analysis') {
           startAnalysis(state.currentFen, { 
@@ -1161,9 +1169,15 @@ async function init() {
           onAnalysisUpdate(result);
         }
       },
-      onError: (err) => showToast(`Engine Error: ${err}`, 'error')
+      onError: (err) => {
+        if (els.statusDot) els.statusDot.classList.add('error');
+        if (els.engineStatusText) els.engineStatusText.textContent = 'Offline';
+        showToast(`Engine Error: ${err}`, 'error');
+      }
     }).catch(e => {
       console.error('Stockfish init failed:', e);
+      if (els.statusDot) els.statusDot.classList.add('error');
+      if (els.engineStatusText) els.engineStatusText.textContent = 'Offline';
       showToast('Failed to initialize Stockfish engine', 'error');
     });
     

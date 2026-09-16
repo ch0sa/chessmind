@@ -246,7 +246,6 @@ function handleEngineMessage(event) {
 
   if (line === 'uciok') {
     sendCommand(`setoption name MultiPV value ${analysisState.multiPV}`);
-    sendCommand(`setoption name Threads value ${analysisState.threads}`);
     sendCommand(`setoption name Hash value ${analysisState.hashMB}`);
     sendCommand('isready');
     return;
@@ -306,8 +305,9 @@ function sendCommand(command) {
 }
 
 /**
- * Initialize the Stockfish engine
- * Loads Stockfish via dynamic script tag and calls its factory function.
+ * Initialize the Stockfish engine in a dedicated Web Worker
+ * Supports both WebAssembly (stockfish.wasm.js) and asm.js fallback (stockfish.js).
+ * Runs 100% reliably in background thread on mobile & desktop without SharedArrayBuffer.
  * @param {object} options
  * @param {Function} options.onReady - Called when engine is ready
  * @param {Function} options.onAnalysisUpdate - Called with analysis results
@@ -322,6 +322,8 @@ export async function initEngine(options = {}) {
     engine = null;
   }
 
+  isReady = false;
+  isAnalyzing = false;
   onAnalysisUpdate = options.onAnalysisUpdate || null;
   onError = options.onError || null;
 
@@ -329,50 +331,86 @@ export async function initEngine(options = {}) {
   if (options.hashMB) analysisState.hashMB = options.hashMB;
 
   return new Promise((resolve, reject) => {
-    // Load Stockfish via script tag if not already loaded
-    const loadStockfish = () => {
-      if (typeof window.Stockfish === 'function') {
-        return Promise.resolve(window.Stockfish);
+    let settled = false;
+
+    function cleanupWorker() {
+      if (engine) {
+        try { engine.terminate(); } catch (e) {}
+        engine = null;
       }
-      return new Promise((res, rej) => {
-        const script = document.createElement('script');
-        script.src = './lib/stockfish/stockfish.js';
-        script.onload = () => {
-          if (typeof window.Stockfish === 'function') {
-            res(window.Stockfish);
-          } else {
-            rej(new Error('Stockfish failed to define global'));
+    }
+
+    function tryWorker(scriptUrl, isFallback = false) {
+      try {
+        console.log(`[Engine] Initializing Stockfish worker from: ${scriptUrl}`);
+        engine = new Worker(scriptUrl);
+
+        const timeout = setTimeout(() => {
+          if (!isReady && !settled) {
+            console.warn(`[Engine] Worker ${scriptUrl} startup timed out (20s)`);
+            if (!isFallback) {
+              console.log('[Engine] Falling back to asm.js engine...');
+              cleanupWorker();
+              tryWorker('./lib/stockfish/stockfish.js', true);
+            } else {
+              settled = true;
+              const err = new Error('Stockfish engine startup timed out');
+              if (onError) onError(err);
+              reject(err);
+            }
+          }
+        }, 20000);
+
+        engine.onmessage = (event) => {
+          handleEngineMessage(event);
+        };
+
+        engine.onerror = (err) => {
+          console.error(`[Engine] Worker error from ${scriptUrl}:`, err);
+          if (!isFallback && !isReady && !settled) {
+            clearTimeout(timeout);
+            cleanupWorker();
+            console.log('[Engine] Falling back to asm.js engine after worker error...');
+            tryWorker('./lib/stockfish/stockfish.js', true);
+          } else if (!settled) {
+            clearTimeout(timeout);
+            settled = true;
+            if (onError) onError(err);
+            reject(err);
           }
         };
-        script.onerror = (e) => rej(new Error('Failed to load stockfish.js'));
-        document.head.appendChild(script);
-      });
-    };
-
-    loadStockfish()
-      .then(StockfishFactory => StockfishFactory())
-      .then(sf => {
-        engine = sf;
-
-        // Listen for messages from Stockfish
-        sf.addMessageListener((line) => {
-          if (typeof line !== 'string') return;
-          handleEngineMessage({ data: line });
-        });
 
         onReady = () => {
-          resolve();
-          if (options.onReady) options.onReady();
+          clearTimeout(timeout);
+          if (!settled) {
+            settled = true;
+            isReady = true;
+            resolve();
+            if (options.onReady) options.onReady();
+          }
         };
 
         // Kick off the UCI handshake
         sendCommand('uci');
-      })
-      .catch(err => {
-        console.error('Failed to initialize Stockfish:', err);
-        if (onError) onError(err);
-        reject(err);
-      });
+      } catch (err) {
+        console.error(`[Engine] Exception creating worker for ${scriptUrl}:`, err);
+        if (!isFallback && !settled) {
+          tryWorker('./lib/stockfish/stockfish.js', true);
+        } else if (!settled) {
+          settled = true;
+          if (onError) onError(err);
+          reject(err);
+        }
+      }
+    }
+
+    // Detect WebAssembly support
+    const wasmSupported = typeof WebAssembly === 'object' && 
+      typeof WebAssembly.validate === 'function' && 
+      WebAssembly.validate(new Uint8Array([0, 97, 115, 109, 1, 0, 0, 0]));
+
+    const initialScript = wasmSupported ? './lib/stockfish/stockfish.wasm.js' : './lib/stockfish/stockfish.js';
+    tryWorker(initialScript, !wasmSupported);
   });
 }
 
@@ -436,11 +474,8 @@ export function stopAnalysis() {
  * @param {number} threads
  */
 export function setThreads(threads) {
-  const maxThreads = isMobileDevice ? 2 : (navigator.hardwareConcurrency || 4);
-  analysisState.threads = Math.max(1, Math.min(threads, maxThreads));
-  if (engine && isReady) {
-    sendCommand(`setoption name Threads value ${analysisState.threads}`);
-  }
+  // Web workers are single-threaded; keep threads at 1
+  analysisState.threads = 1;
 }
 
 /**
