@@ -201,6 +201,52 @@ async function testControls() {
   await page.click('#free-mode-btn');
   await new Promise(r => setTimeout(r, 300));
 
+  console.log('\n--- 4b. Testing Regular Move After Free Move OFF ---');
+  // Attempt regular move: White Pawn a2 to a4 (or check whose turn it is)
+  const currentTurn = await page.evaluate(() => window.appState.chess.turn());
+  const groundTurn = await page.evaluate(() => window.appState.ground.state.turnColor);
+  const movableColor = await page.evaluate(() => window.appState.ground.state.movable.color);
+  console.log(`Current state: chess.turn()=${currentTurn}, ground.turnColor=${groundTurn}, movable.color=${movableColor}`);
+
+  const fromSq = currentTurn === 'w' ? 'a2' : 'a7';
+  const toSq = currentTurn === 'w' ? 'a4' : 'a5';
+  console.log(`Attempting regular move ${fromSq} -> ${toSq}...`);
+  const fromPos = await getSquareCenter(fromSq);
+  const toPos = await getSquareCenter(toSq);
+  await page.touchscreen.tap(fromPos.x, fromPos.y);
+  await new Promise(r => setTimeout(r, 200));
+  await page.touchscreen.tap(toPos.x, toPos.y);
+  await new Promise(r => setTimeout(r, 400));
+  const pAtTo = await getPieceAt(toSq);
+  console.log(`Piece at ${toSq} after regular move attempt: [${pAtTo}]`);
+  const move4bSuccess = pAtTo !== null && pAtTo.includes('pawn');
+  if (move4bSuccess) {
+    console.log(`✅ TEST 4b PASSED: Regular move (${fromSq} -> ${toSq}) succeeded after Free Move OFF!`);
+  } else {
+    console.error(`❌ TEST 4b FAILED: Regular move (${fromSq} -> ${toSq}) failed after Free Move OFF!`);
+  }
+
+  console.log('\n--- 4c. Testing Consecutive Regular Move (Opposite Color) ---');
+  const nextTurn = await page.evaluate(() => window.appState.chess.turn());
+  const nextGroundTurn = await page.evaluate(() => window.appState.ground.state.turnColor);
+  console.log(`Turn after 4b: chess.turn()=${nextTurn}, ground.turnColor=${nextGroundTurn}`);
+  const from2 = nextTurn === 'w' ? 'b2' : 'b7';
+  const to2 = nextTurn === 'w' ? 'b4' : 'b5';
+  const from2Pos = await getSquareCenter(from2);
+  const to2Pos = await getSquareCenter(to2);
+  await page.touchscreen.tap(from2Pos.x, from2Pos.y);
+  await new Promise(r => setTimeout(r, 200));
+  await page.touchscreen.tap(to2Pos.x, to2Pos.y);
+  await new Promise(r => setTimeout(r, 400));
+  const pAtTo2 = await getPieceAt(to2);
+  console.log(`Piece at ${to2} after second regular move: [${pAtTo2}]`);
+  const move4cSuccess = pAtTo2 !== null && pAtTo2.includes('pawn');
+  if (move4cSuccess) {
+    console.log(`✅ TEST 4c PASSED: Consecutive regular move (${from2} -> ${to2}) succeeded!`);
+  } else {
+    console.error(`❌ TEST 4c FAILED: Consecutive regular move failed!`);
+  }
+
   console.log('\n--- 5. Testing Quick Palette Piece Placement (White Queen on c4) ---');
   await page.click('.palette-item[data-color="white"][data-role="queen"]');
   const c4Pos = await getSquareCenter('c4');
@@ -216,7 +262,7 @@ async function testControls() {
   }
 
   await browser.close();
-  return { move1Success, move2Success, move3Success, move4Success, move5Success };
+  return { move1Success, move2Success, move3Success, move4Success, move4bSuccess, move4cSuccess, move5Success };
 }
 
 testControls().then(res => {

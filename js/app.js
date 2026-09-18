@@ -221,6 +221,7 @@ function handleClearBoard() {
     fen: '8/8/8/8/8/8/8/8',
     lastMove: null,
     autoShapes: [],
+    turnColor: 'white',
     movable: { free: true, color: 'both', dests: new Map() }
   });
   if (els.fenInput) els.fenInput.value = state.currentFen;
@@ -246,10 +247,12 @@ function handleResetStartingPosition() {
     fen: STARTING_FEN,
     lastMove: null,
     autoShapes: [],
+    turnColor: 'white',
     movable: state.freePlacement ? { free: true, color: 'both', dests: new Map() } : {
       free: false,
-      color: state.chess.turn() === 'w' ? 'white' : 'black',
-      dests: getLegalMoves()
+      color: 'white',
+      dests: getLegalMoves(),
+      showDests: true
     }
   });
   if (els.fenInput) els.fenInput.value = state.currentFen;
@@ -264,10 +267,24 @@ function handleBoardMove(orig, dest) {
     if (piece) {
       state.chess.remove(dest);
       state.chess.put(piece, dest);
+
+      // Keep chess.js turn synchronized with piece color moved
+      const nextTurn = piece.color === 'w' ? 'b' : 'w';
+      try {
+        const fenTokens = state.chess.fen().split(' ');
+        fenTokens[1] = nextTurn;
+        fenTokens[3] = '-';
+        state.chess.load(fenTokens.join(' '));
+      } catch (e) {
+        // If non-standard position (e.g. missing king during setup), retain current state
+      }
+
       state.currentFen = state.chess.fen();
+      const activeColor = state.chess.turn() === 'w' ? 'white' : 'black';
       state.ground.set({ 
         fen: state.currentFen, 
         lastMove: [orig, dest],
+        turnColor: activeColor,
         movable: { free: true, color: 'both', dests: new Map() }
       });
       if (els.fenInput) els.fenInput.value = state.currentFen;
@@ -288,15 +305,18 @@ function handleBoardMove(orig, dest) {
     
     if (move) {
       state.currentFen = state.chess.fen();
+      const activeColor = state.chess.turn() === 'w' ? 'white' : 'black';
       
       // Update valid moves on board
       state.ground.set({
         fen: state.currentFen,
         lastMove: [orig, dest],
+        turnColor: activeColor,
         movable: {
           free: false,
-          color: state.chess.turn() === 'w' ? 'white' : 'black',
+          color: activeColor,
           dests: getLegalMoves(),
+          showDests: true
         }
       });
       if (els.fenInput) els.fenInput.value = state.currentFen;
@@ -335,12 +355,15 @@ function handlePiecePlacement(color, role, square) {
   state.chess.remove(square);
   state.chess.put({ type: roleChar, color: colorChar }, square);
   state.currentFen = state.chess.fen();
+  const activeColor = state.chess.turn() === 'w' ? 'white' : 'black';
   state.ground.set({
     fen: state.currentFen,
+    turnColor: activeColor,
     movable: state.freePlacement ? { free: true, color: 'both', dests: new Map() } : {
       free: false,
-      color: state.chess.turn() === 'w' ? 'white' : 'black',
+      color: activeColor,
       dests: getLegalMoves(),
+      showDests: true
     }
   });
   if (els.fenInput) els.fenInput.value = state.currentFen;
@@ -354,12 +377,15 @@ function handlePiecePlacement(color, role, square) {
 function handlePieceRemoval(square) {
   state.chess.remove(square);
   state.currentFen = state.chess.fen();
+  const activeColor = state.chess.turn() === 'w' ? 'white' : 'black';
   state.ground.set({
     fen: state.currentFen,
+    turnColor: activeColor,
     movable: state.freePlacement ? { free: true, color: 'both', dests: new Map() } : {
       free: false,
-      color: state.chess.turn() === 'w' ? 'white' : 'black',
+      color: activeColor,
       dests: getLegalMoves(),
+      showDests: true
     }
   });
   if (els.fenInput) els.fenInput.value = state.currentFen;
@@ -377,12 +403,16 @@ function handleMoveExecution(parsed) {
       const move = state.chess.move({ from: parsed.from, to: parsed.to, promotion: parsed.promotion || 'q' });
       if (move) {
         state.currentFen = state.chess.fen();
+        const activeColor = state.chess.turn() === 'w' ? 'white' : 'black';
         state.ground.set({
           fen: state.currentFen,
           lastMove: [move.from, move.to],
-          movable: state.freePlacement ? { free: true, color: 'both' } : {
-            color: state.chess.turn() === 'w' ? 'white' : 'black',
+          turnColor: activeColor,
+          movable: state.freePlacement ? { free: true, color: 'both', dests: new Map() } : {
+            free: false,
+            color: activeColor,
             dests: getLegalMoves(),
+            showDests: true
           }
         });
         if (els.fenInput) els.fenInput.value = state.currentFen;
@@ -407,8 +437,23 @@ function handleMoveExecution(parsed) {
       if (piece) {
         state.chess.remove(parsed.to);
         state.chess.put(piece, parsed.to);
+
+        const nextTurn = piece.color === 'w' ? 'b' : 'w';
+        try {
+          const fenTokens = state.chess.fen().split(' ');
+          fenTokens[1] = nextTurn;
+          fenTokens[3] = '-';
+          state.chess.load(fenTokens.join(' '));
+        } catch (e) {}
+
         state.currentFen = state.chess.fen();
-        state.ground.set({ fen: state.currentFen, lastMove: [parsed.from, parsed.to] });
+        const activeColor = state.chess.turn() === 'w' ? 'white' : 'black';
+        state.ground.set({ 
+          fen: state.currentFen, 
+          lastMove: [parsed.from, parsed.to],
+          turnColor: activeColor,
+          movable: { free: true, color: 'both', dests: new Map() }
+        });
         if (els.fenInput) els.fenInput.value = state.currentFen;
         showToast(`Moved ${parsed.from} to ${parsed.to}`, 'success', 1500);
         if (state.engineReady) {
@@ -431,12 +476,16 @@ function handleMoveExecution(parsed) {
       const move = state.chess.move(parsed.san || { to: parsed.to });
       if (move) {
         state.currentFen = state.chess.fen();
+        const activeColor = state.chess.turn() === 'w' ? 'white' : 'black';
         state.ground.set({
           fen: state.currentFen,
           lastMove: [move.from, move.to],
-          movable: state.freePlacement ? { free: true, color: 'both' } : {
-            color: state.chess.turn() === 'w' ? 'white' : 'black',
+          turnColor: activeColor,
+          movable: state.freePlacement ? { free: true, color: 'both', dests: new Map() } : {
+            free: false,
+            color: activeColor,
             dests: getLegalMoves(),
+            showDests: true
           }
         });
         if (els.fenInput) els.fenInput.value = state.currentFen;
@@ -561,12 +610,14 @@ function updateAnalysisUI(result) {
   // Draw arrow for best move
   if (result.bestMove && state.ground) {
     const move = parseUCIMove(result.bestMove);
-    if (move) {
+    if (move && /^[a-h][1-8]$/.test(move.from) && /^[a-h][1-8]$/.test(move.to)) {
       state.ground.setAutoShapes([{
         orig: move.from,
         dest: move.to,
         brush: 'green',
       }]);
+    } else {
+      state.ground.setAutoShapes([]);
     }
   }
 }
@@ -609,14 +660,17 @@ async function handleModeToggle() {
     showToast('Analysis Mode', 'success', 2000);
     
     // Update board configuration for analysis mode (enforce rules)
+    const activeColor = state.chess.turn() === 'w' ? 'white' : 'black';
     state.ground.set({
       fen: state.chess.fen(),
+      turnColor: activeColor,
       movable: state.freePlacement 
         ? { free: true, color: 'both', dests: new Map() } 
         : {
           free: false,
-          color: state.chess.turn() === 'w' ? 'white' : 'black',
+          color: activeColor,
           dests: getLegalMoves(),
+          showDests: true
         },
       events: {
         move: handleBoardMove,
@@ -651,11 +705,16 @@ async function handleModeToggle() {
 
 function getLegalMoves() {
   const dests = new Map();
-  state.chess.moves({ verbose: true }).forEach(m => {
-    const a = dests.get(m.from) || [];
-    a.push(m.to);
-    dests.set(m.from, a);
-  });
+  try {
+    if (!state.chess) return dests;
+    state.chess.moves({ verbose: true }).forEach(m => {
+      const a = dests.get(m.from) || [];
+      a.push(m.to);
+      dests.set(m.from, a);
+    });
+  } catch (e) {
+    console.warn('Could not compute legal moves:', e);
+  }
   return dests;
 }
 
@@ -892,10 +951,12 @@ function bindEvents() {
   if (els.freeModeBtn) {
     els.freeModeBtn.addEventListener('click', () => {
       state.freePlacement = !state.freePlacement;
+      const activeColor = state.chess.turn() === 'w' ? 'white' : 'black';
       if (state.freePlacement) {
         els.freeModeBtn.classList.add('active');
         els.freeModeBtn.textContent = '✋ Free Move: ON';
         state.ground.set({
+          turnColor: activeColor,
           movable: { free: true, color: 'both', dests: new Map() },
           events: {
             move: handleBoardMove,
@@ -907,13 +968,19 @@ function bindEvents() {
         els.freeModeBtn.classList.remove('active');
         els.freeModeBtn.textContent = '✋ Free Move: OFF';
         state.ground.set({
-          movable: { free: false, color: state.chess.turn() === 'w' ? 'white' : 'black', dests: getLegalMoves() },
+          turnColor: activeColor,
+          movable: { 
+            free: false, 
+            color: activeColor, 
+            dests: getLegalMoves(),
+            showDests: true
+          },
           events: {
             move: handleBoardMove,
             select: handleBoardSelect
           }
         });
-        showToast('Standard Rules: ON', 'info', 2000);
+        showToast(`Standard Rules: ON (${activeColor} to move)`, 'info', 2000);
       }
     });
   }
@@ -992,12 +1059,17 @@ function handleVoiceMove(san, from, to, promotion) {
     try {
       const move = state.chess.move(san || { from, to, promotion: promotion || 'q' });
       if (move) {
+        state.currentFen = state.chess.fen();
+        const activeColor = state.chess.turn() === 'w' ? 'white' : 'black';
         state.ground.set({
-          fen: state.chess.fen(),
+          fen: state.currentFen,
           lastMove: [move.from, move.to],
+          turnColor: activeColor,
           movable: {
-            color: state.chess.turn() === 'w' ? 'white' : 'black',
+            free: false,
+            color: activeColor,
             dests: getLegalMoves(),
+            showDests: true
           }
         });
         showToast(`Move made: ${move.san}`, 'success', 1500);

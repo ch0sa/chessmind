@@ -10,18 +10,18 @@
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>♞</text></svg>">
 
     <!-- Chessground CSS (Local & Offline) -->
-    <link rel="stylesheet" href="css/chessground.base.css?v=13">
-    <link rel="stylesheet" href="css/chessground.brown.css?v=13">
-    <link rel="stylesheet" href="css/chessground.cburnett.css?v=13">
+    <link rel="stylesheet" href="css/chessground.base.css?v=14">
+    <link rel="stylesheet" href="css/chessground.brown.css?v=14">
+    <link rel="stylesheet" href="css/chessground.cburnett.css?v=14">
     
     <!-- Modern App CSS -->
-    <link rel="stylesheet" href="css/app.css?v=13">
+    <link rel="stylesheet" href="css/app.css?v=14">
     
     <!-- Service Worker Registration -->
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('./sw.js?v=13')
+          navigator.serviceWorker.register('./sw.js?v=14')
             .then(reg => console.log('SW registered:', reg.scope))
             .catch(err => console.warn('SW registration failed:', err));
         });
