@@ -251,16 +251,34 @@ export function isListening() {
 export function startPushToTalk() {
     if (!recognition) return false;
     shouldBeListening = true;
-    try {
-        recognition.stop();
-    } catch (e) {}
-    try {
-        recognition.continuous = false;
-        recognition.start();
-        return true;
-    } catch (e) {
-        console.warn('PTT start error:', e);
-        return false;
+
+    const beginRecognition = () => {
+        try {
+            recognition.continuous = false;
+            recognition.start();
+            return true;
+        } catch (e) {
+            // Already started or starting
+            if (e.name !== 'InvalidStateError') {
+                console.warn('PTT start error:', e);
+            }
+            return false;
+        }
+    };
+
+    if (isCurrentlyListening) {
+        try {
+            recognition.onend = () => {
+                isCurrentlyListening = false;
+                beginRecognition();
+            };
+            recognition.stop();
+            return true;
+        } catch (e) {
+            return beginRecognition();
+        }
+    } else {
+        return beginRecognition();
     }
 }
 
@@ -287,9 +305,11 @@ export function speak(text, options = {}) {
         return Promise.resolve();
     }
 
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
         // Cancel any ongoing speech
-        synthesis.cancel();
+        try {
+            synthesis.cancel();
+        } catch (e) {}
         
         const chunks = chunkText(text);
         let currentChunkIndex = 0;
@@ -333,14 +353,14 @@ export function speak(text, options = {}) {
                 console.error('Speech synthesis error:', event);
                 if (shouldBeListening) setStatus('listening');
                 else setStatus('idle');
-                // Don't reject, just resolve to avoid breaking promise chains
                 resolve(); 
             };
             
             synthesis.speak(utterance);
         };
         
-        speakNextChunk();
+        // Brief 50ms buffer to allow browser speech queue to reset cleanly after cancel()
+        setTimeout(speakNextChunk, 50);
     });
 }
 

@@ -99,6 +99,7 @@ button {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
+  min-height: 100dvh;
   width: 100%;
   max-width: 1280px;
   margin: 0 auto;
@@ -192,7 +193,7 @@ button {
   flex: 1;
   display: flex;
   flex-direction: column;
-  padding: 12px 12px calc(var(--dock-height) + 16px) 12px;
+  padding: 12px 12px 24px 12px;
   gap: 12px;
   max-width: 100%;
 }
@@ -213,28 +214,30 @@ button {
 .board-wrapper {
   position: relative;
   width: 100%;
-  aspect-ratio: 1 / 1;
+  display: flex;
+  flex-direction: row;
   border-radius: var(--radius-md);
   overflow: hidden;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
   background-color: #262421;
   border: 1px solid var(--border-default);
+  touch-action: none;
 }
 
 /* Integrated Sleek Eval Bar */
 .eval-gauge {
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
   width: 6px;
+  flex-shrink: 0;
+  position: relative;
   background-color: var(--eval-black);
-  z-index: 20;
+  z-index: 5;
   transition: width 0.2s ease;
 }
 
-.board-wrapper:hover .eval-gauge {
-  width: 10px;
+@media (hover: hover) {
+  .board-wrapper:hover .eval-gauge {
+    width: 10px;
+  }
 }
 
 .eval-gauge-fill {
@@ -247,15 +250,26 @@ button {
   transition: height 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+/* Board Square Container (Pure 1:1 Aspect Ratio) */
+.board-square-container {
+  flex: 1;
+  position: relative;
+  aspect-ratio: 1 / 1;
+  touch-action: none;
+}
+
 /* Chessground Board Mount */
 .cg-board-wrap {
   position: absolute;
-  top: 0;
-  left: 6px;
-  right: 0;
-  bottom: 0;
-  width: calc(100% - 6px) !important;
+  inset: 0;
+  width: 100% !important;
   height: 100% !important;
+  touch-action: none;
+}
+
+/* Prevent browser scroll gestures from interrupting drag */
+cg-board, cg-container {
+  touch-action: none;
 }
 
 /* Ensure pieces scale perfectly */

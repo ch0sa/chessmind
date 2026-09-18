@@ -4,8 +4,6 @@
  * @module analysis
  */
 
-// Stockfish WASM worker URL - will be loaded from lib/stockfish/
-const STOCKFISH_WORKER_URL = './lib/stockfish/wrapper.js';
 
 /** @type {Worker|null} */
 let engine = null;
@@ -340,18 +338,24 @@ export async function initEngine(options = {}) {
       }
     }
 
+    // Construct full URLs so worker scripts resolve consistently regardless of routing
+    const baseUrl = typeof window !== 'undefined' && window.location ? window.location.href : '';
+    const wasmScriptUrl = new URL('./lib/stockfish/stockfish.wasm.js', baseUrl).href;
+    const asmScriptUrl = new URL('./lib/stockfish/stockfish.js', baseUrl).href;
+
     function tryWorker(scriptUrl, isFallback = false) {
       try {
         console.log(`[Engine] Initializing Stockfish worker from: ${scriptUrl}`);
         engine = new Worker(scriptUrl);
 
+        const timeoutMs = isFallback ? 45000 : 25000;
         const timeout = setTimeout(() => {
           if (!isReady && !settled) {
-            console.warn(`[Engine] Worker ${scriptUrl} startup timed out (20s)`);
+            console.warn(`[Engine] Worker ${scriptUrl} startup timed out (${timeoutMs / 1000}s)`);
             if (!isFallback) {
               console.log('[Engine] Falling back to asm.js engine...');
               cleanupWorker();
-              tryWorker('./lib/stockfish/stockfish.js', true);
+              tryWorker(asmScriptUrl, true);
             } else {
               settled = true;
               const err = new Error('Stockfish engine startup timed out');
@@ -359,22 +363,24 @@ export async function initEngine(options = {}) {
               reject(err);
             }
           }
-        }, 20000);
+        }, timeoutMs);
 
         engine.onmessage = (event) => {
           handleEngineMessage(event);
         };
 
-        engine.onerror = (err) => {
-          console.error(`[Engine] Worker error from ${scriptUrl}:`, err);
+        engine.onerror = (evt) => {
+          const errMsg = evt?.message || evt?.error?.message || (typeof evt === 'string' ? evt : 'Web Worker failed to load');
+          console.error(`[Engine] Worker error from ${scriptUrl}:`, errMsg, evt);
           if (!isFallback && !isReady && !settled) {
             clearTimeout(timeout);
             cleanupWorker();
             console.log('[Engine] Falling back to asm.js engine after worker error...');
-            tryWorker('./lib/stockfish/stockfish.js', true);
+            tryWorker(asmScriptUrl, true);
           } else if (!settled) {
             clearTimeout(timeout);
             settled = true;
+            const err = new Error(errMsg);
             if (onError) onError(err);
             reject(err);
           }
@@ -393,13 +399,15 @@ export async function initEngine(options = {}) {
         // Kick off the UCI handshake
         sendCommand('uci');
       } catch (err) {
+        const errMsg = err?.message || (typeof err === 'string' ? err : 'Exception creating worker');
         console.error(`[Engine] Exception creating worker for ${scriptUrl}:`, err);
         if (!isFallback && !settled) {
-          tryWorker('./lib/stockfish/stockfish.js', true);
+          tryWorker(asmScriptUrl, true);
         } else if (!settled) {
           settled = true;
-          if (onError) onError(err);
-          reject(err);
+          const errorObj = new Error(errMsg);
+          if (onError) onError(errorObj);
+          reject(errorObj);
         }
       }
     }
@@ -409,7 +417,7 @@ export async function initEngine(options = {}) {
       typeof WebAssembly.validate === 'function' && 
       WebAssembly.validate(new Uint8Array([0, 97, 115, 109, 1, 0, 0, 0]));
 
-    const initialScript = wasmSupported ? './lib/stockfish/stockfish.wasm.js' : './lib/stockfish/stockfish.js';
+    const initialScript = wasmSupported ? wasmScriptUrl : asmScriptUrl;
     tryWorker(initialScript, !wasmSupported);
   });
 }

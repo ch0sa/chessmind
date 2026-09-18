@@ -2,26 +2,26 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>ChessMind - Modern Offline Chess Analysis</title>
     <meta name="description" content="Free offline chess analysis powered by Stockfish WASM. Manual piece placement, push-to-talk voice commands, and zero ads.">
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#0d1117">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>♞</text></svg>">
 
-    <!-- Chessground CSS -->
-    <link rel="stylesheet" href="https://unpkg.com/chessground@9.1.1/assets/chessground.base.css">
-    <link rel="stylesheet" href="https://unpkg.com/chessground@9.1.1/assets/chessground.brown.css">
-    <link rel="stylesheet" href="https://unpkg.com/chessground@9.1.1/assets/chessground.cburnett.css">
+    <!-- Chessground CSS (Local & Offline) -->
+    <link rel="stylesheet" href="css/chessground.base.css?v=11">
+    <link rel="stylesheet" href="css/chessground.brown.css?v=11">
+    <link rel="stylesheet" href="css/chessground.cburnett.css?v=11">
     
     <!-- Modern App CSS -->
-    <link rel="stylesheet" href="css/app.css?v=10">
+    <link rel="stylesheet" href="css/app.css?v=11">
     
     <!-- Service Worker Registration -->
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('./sw.js?v=10')
+          navigator.serviceWorker.register('./sw.js?v=11')
             .then(reg => console.log('SW registered:', reg.scope))
             .catch(err => console.warn('SW registration failed:', err));
         });
@@ -64,8 +64,10 @@
                     <div id="eval-bar" class="eval-gauge" aria-hidden="true">
                         <div id="eval-fill" class="eval-gauge-fill"></div>
                     </div>
-                    <!-- Chessground Mount -->
-                    <div id="board" class="cg-board-wrap"></div>
+                    <!-- Perfect Square Chessground Mount Container -->
+                    <div class="board-square-container">
+                        <div id="board" class="cg-board-wrap"></div>
+                    </div>
                 </div>
 
                 <!-- Instant Engine HUD Strip (Directly Below Board) -->
@@ -151,15 +153,6 @@
         </main>
     </div>
 
-    <!-- Hidden compatibility bridges -->
-    <div style="display: none;">
-        <button id="mode-toggle-btn">Setup</button>
-        <button id="voice-btn">Voice</button>
-        <button id="tts-btn">TTS</button>
-        <button id="help-tool-btn">Guide</button>
-        <select id="voice-engine"><option value="web-speech">Web</option></select>
-        <input type="checkbox" id="lite-mode">
-    </div>
 
     <!-- Help & Guide Modal -->
     <div id="help-modal" class="modal-backdrop hidden" role="dialog" aria-labelledby="guide-title">

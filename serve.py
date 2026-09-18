@@ -206,10 +206,6 @@ class ChessMindRequestHandler(http.server.SimpleHTTPRequestHandler):
         self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, HEAD')
         self.send_header('Access-Control-Allow-Headers', '*')
 
-        # Crucial security headers required for SharedArrayBuffer in modern browsers
-        # Without these, Stockfish WASM cannot run multi-threaded workers
-        self.send_header('Cross-Origin-Opener-Policy', 'same-origin')
-        self.send_header('Cross-Origin-Embedder-Policy', 'require-corp')
         self.send_header('Cross-Origin-Resource-Policy', 'cross-origin')
 
         # Development cache control

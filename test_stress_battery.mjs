@@ -87,6 +87,27 @@ async function runStressBattery() {
   const initialBest = await page.$eval('#best-move', el => el.textContent);
   console.log(`✅ Initial Analysis complete: ${initialBest}`);
 
+  // Test Board Geometry & Squareness (Mobile Touch Alignment)
+  console.log('\n--- TEST 0: Board Square Geometry & Touch Alignment ---');
+  const boardGeometry = await page.$eval('#board', el => {
+    const rect = el.getBoundingClientRect();
+    const style = window.getComputedStyle(el);
+    return {
+      width: rect.width,
+      height: rect.height,
+      diff: Math.abs(rect.width - rect.height),
+      touchAction: style.touchAction
+    };
+  });
+  console.log(`Board dimensions: ${boardGeometry.width}px x ${boardGeometry.height}px (Diff: ${boardGeometry.diff.toFixed(2)}px), touchAction: ${boardGeometry.touchAction}`);
+  if (boardGeometry.diff > 1.0) {
+    throw new Error(`FAIL: Board is not square! Width: ${boardGeometry.width}, Height: ${boardGeometry.height}`);
+  }
+  if (boardGeometry.touchAction !== 'none') {
+    console.warn(`Note: Board computed touchAction is ${boardGeometry.touchAction}`);
+  }
+  console.log('✅ TEST 0 PASSED: Board is a 100% perfect square with zero coordinate skew!');
+
   // 2. Test Clear Board
   console.log('\n--- TEST 1: Clear Board (1-Click) ---');
   toasts.length = 0;

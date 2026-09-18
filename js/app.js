@@ -1,4 +1,3 @@
-import { initSetupMode } from './board-setup.js';
 import { 
   initEngine, startAnalysis, stopAnalysis, setDepth, setMultiPV, setThreads, 
   evalToHuman, evalToBarPercent, parseUCIMove, formatNodes, formatNPS, 
@@ -6,7 +5,7 @@ import {
 } from './analysis.js';
 import { 
   initVoice, startListening, stopListening, isListening, 
-  startPushToTalk, stopPushToTalk, speak, setTTSEnabled, isTTSEnabled 
+  startPushToTalk, stopPushToTalk, speak, setTTSEnabled, isTTSEnabled, setRate 
 } from './voice-controller.js';
 import { parseFen, STARTING_FEN, EMPTY_FEN } from './fen-utils.js';
 import { formatMoveForSpeech, parseSpokenMove } from './move-parser.js';
@@ -16,7 +15,6 @@ const state = {
   mode: 'analysis',          // 'setup' | 'analysis'
   ground: null,           // Chessground instance
   chess: null,            // chess.js instance
-  setupController: null,  // from board-setup.js
   currentFen: STARTING_FEN,
   boardOrientation: 'white',
   engineReady: false,
@@ -30,7 +28,7 @@ const state = {
     threads: (typeof window !== 'undefined' && (window.innerWidth <= 768 || /Android|iPhone|iPad/i.test(navigator.userAgent))) ? 1 : Math.max(1, Math.min(2, Math.floor((navigator.hardwareConcurrency || 2) / 2))),
     ttsEnabled: false,
     ttsVoice: null,
-    ttsRate: 1.0,
+    ttsSpeed: 1.0,
     liteMode: false,
   }
 };
@@ -38,26 +36,28 @@ const state = {
 // DOM Elements
 const els = {};
 
-// Load Chessground dynamically, with a script tag fallback
+// Load Chessground dynamically (local first, fallback to CDN)
 async function loadChessground() {
   try {
-    const cg = await import('https://unpkg.com/chessground@9.1.1/dist/chessground.min.js');
+    const cg = await import('../lib/chessground.min.js');
     return cg.Chessground || window.Chessground;
   } catch (error) {
-    console.warn('Failed to load Chessground via ES module. Falling back to script tag.', error);
-    return new Promise((resolve, reject) => {
-      const script = document.createElement('script');
-      script.src = 'https://unpkg.com/chessground@9.1.1/dist/chessground.min.js';
-      script.onload = () => {
-        if (window.Chessground) {
-          resolve(window.Chessground);
-        } else {
-          reject(new Error('Chessground not found on window object after script load.'));
-        }
-      };
-      script.onerror = () => reject(new Error('Failed to load Chessground script.'));
-      document.head.appendChild(script);
-    });
+    console.warn('Failed to load local Chessground, falling back to CDN', error);
+    try {
+      const cg = await import('https://unpkg.com/chessground@9.1.1/dist/chessground.min.js');
+      return cg.Chessground || window.Chessground;
+    } catch (e) {
+      return new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = 'https://unpkg.com/chessground@9.1.1/dist/chessground.min.js';
+        script.onload = () => {
+          if (window.Chessground) resolve(window.Chessground);
+          else reject(new Error('Chessground not found after script load'));
+        };
+        script.onerror = () => reject(new Error('Failed to load Chessground script'));
+        document.head.appendChild(script);
+      });
+    }
   }
 }
 
@@ -135,22 +135,18 @@ function applyTheme() {
 
 function initDOM() {
   els.board = document.getElementById('board');
-  els.modeToggleBtn = document.getElementById('mode-toggle-btn');
   els.analyzeBtn = document.getElementById('analyze-btn');
   els.stopBtn = document.getElementById('stop-btn');
   els.flipBtn = document.getElementById('flip-board-btn');
-  els.depthSlider = document.getElementById('depth-slider');
-  els.depthValue = document.getElementById('depth-val');
-  els.voiceToggleBtn = document.getElementById('voice-btn');
-  els.ttsToggleBtn = document.getElementById('tts-toggle-btn') || document.getElementById('tts-btn');
-  els.fenInput = document.getElementById('fen-input');
-  els.copyFenBtn = document.querySelector('[data-action="copy-fen"]');
-  els.clearBoardBtn = document.querySelector('[data-action="clear-board"]') || document.getElementById('clear-board-btn');
-  els.startingPosBtn = document.querySelector('[data-action="start-pos"]') || document.getElementById('start-pos-btn');
+  els.ttsToggleBtn = document.getElementById('tts-toggle-btn');
+  els.clearBoardBtn = document.getElementById('clear-board-btn');
+  els.startingPosBtn = document.getElementById('start-pos-btn');
   els.settingsBtn = document.getElementById('settings-btn');
   els.closeSettingsBtn = document.getElementById('close-settings');
   els.settingsModal = document.getElementById('settings-modal');
-  els.themeToggleBtn = document.getElementById('theme-toggle');
+  els.themeToggle = document.getElementById('theme-toggle');
+  els.multiPvInput = document.getElementById('multipv-count');
+  els.ttsSpeedInput = document.getElementById('tts-speed');
   
   // Analysis panels
   els.evalBar = document.getElementById('eval-bar');
@@ -167,45 +163,18 @@ function initDOM() {
   els.commandSubmitBtn = document.getElementById('command-submit-btn');
   els.pttBtn = document.getElementById('ptt-btn');
   els.freeModeBtn = document.getElementById('free-mode-btn');
-  els.quickPalette = document.getElementById('quick-palette');
 
   // Help & Guide Modal
   els.helpBtn = document.getElementById('help-btn');
-  els.helpToolBtn = document.getElementById('help-tool-btn');
   els.helpModal = document.getElementById('help-modal');
   els.closeHelpBtn = document.getElementById('close-help');
 
-  // Header & Dock elements
+  // Status elements
   els.statusDot = document.getElementById('status-dot');
   els.engineStatusText = document.getElementById('engine-status-text');
-  els.dockTtsBtn = document.getElementById('dock-tts-btn');
-  els.dockHelpBtn = document.getElementById('dock-help-btn');
-}
-
-function switchTab(tabId) {
-  document.querySelectorAll('.tab-btn').forEach(btn => {
-    const matches = btn.getAttribute('data-tab') === tabId;
-    btn.classList.toggle('active', matches);
-    btn.setAttribute('aria-selected', matches ? 'true' : 'false');
-  });
-  
-  document.querySelectorAll('.dock-btn[data-dock]').forEach(btn => {
-    btn.classList.toggle('active', btn.getAttribute('data-dock') === tabId);
-  });
-  
-  document.querySelectorAll('.tab-panel').forEach(panel => {
-    panel.classList.toggle('active', panel.id === `tab-${tabId}`);
-  });
-  
-  if (state.ground) {
-    setTimeout(() => state.ground.redrawAll(), 50);
-  }
 }
 
 function getFenFromBoard() {
-  if (state.mode === 'setup' && state.setupController && typeof state.setupController.getCurrentFen === 'function') {
-    return state.setupController.getCurrentFen();
-  }
   return state.currentFen;
 }
 
@@ -634,9 +603,6 @@ async function handleModeToggle() {
     
     state.mode = 'analysis';
     document.body.setAttribute('data-mode', state.mode);
-    if (state.setupController) {
-      state.setupController.disable();
-    }
     
     if (els.modeToggleBtn) els.modeToggleBtn.innerHTML = '<span class="icon">♟</span> <span class="label">Switch to Setup</span>';
     showToast('Analysis Mode', 'success', 2000);
@@ -654,9 +620,6 @@ async function handleModeToggle() {
       events: {
         move: handleBoardMove,
         select: handleBoardSelect,
-        change: () => {
-          if (els.fenInput) els.fenInput.value = getFenFromBoard();
-        }
       }
     });
 
@@ -676,9 +639,6 @@ async function handleModeToggle() {
     
     state.mode = 'setup';
     document.body.setAttribute('data-mode', state.mode);
-    if (state.setupController) {
-      state.setupController.enable();
-    }
     
     if (els.modeToggleBtn) els.modeToggleBtn.innerHTML = '<span class="icon">♟</span> <span class="label">Switch to Analysis</span>';
     showToast('Setup Mode', 'info', 2000);
@@ -819,29 +779,6 @@ function bindEvents() {
     });
   }
   
-  // FEN Input
-  if (els.fenInput) {
-    els.fenInput.value = state.currentFen;
-    const handleFenChange = () => {
-      const fen = els.fenInput.value.trim();
-      if (state.setupController && state.mode === 'setup') {
-        state.setupController.loadFen(fen);
-      }
-    };
-    els.fenInput.addEventListener('change', handleFenChange);
-    els.fenInput.addEventListener('blur', handleFenChange);
-  }
-  
-  // Copy FEN
-  if (els.copyFenBtn) {
-    els.copyFenBtn.addEventListener('click', () => {
-      const fen = getFenFromBoard();
-      navigator.clipboard.writeText(fen)
-        .then(() => showToast('FEN copied!', 'success'))
-        .catch(() => showToast('Failed to copy FEN', 'error'));
-    });
-  }
-  
   // Clear Board / Starting Position
   if (els.clearBoardBtn) {
     els.clearBoardBtn.addEventListener('click', handleClearBoard);
@@ -858,30 +795,39 @@ function bindEvents() {
   if (els.closeSettingsBtn && els.settingsModal) {
     els.closeSettingsBtn.addEventListener('click', () => els.settingsModal.classList.add('hidden'));
   }
-  if (els.themeToggleBtn) {
-    els.themeToggleBtn.addEventListener('click', () => {
-      state.settings.theme = state.settings.theme === 'dark' ? 'light' : 'dark';
+  if (els.themeToggle) {
+    els.themeToggle.value = state.settings.theme;
+    els.themeToggle.addEventListener('change', (e) => {
+      state.settings.theme = e.target.value;
       applyTheme();
       saveSettings();
     });
   }
-
-  // Castling & Active Color events can be bound inside board-setup.js or directly here if needed
-  document.querySelectorAll('.castling-checkbox').forEach(cb => {
-    cb.addEventListener('change', () => {
-      if (state.mode === 'setup' && state.setupController) {
-        state.setupController.updateCastlingRights();
+  if (els.multiPvInput) {
+    els.multiPvInput.value = state.settings.multiPV;
+    els.multiPvInput.addEventListener('change', (e) => {
+      const val = Math.max(1, Math.min(5, parseInt(e.target.value, 10) || 3));
+      state.settings.multiPV = val;
+      saveSettings();
+      if (state.engineReady && state.mode === 'analysis') {
+        startAnalysis(state.currentFen, { 
+          depth: state.settings.depth, 
+          multiPV: state.settings.multiPV,
+          threads: state.settings.threads
+        });
       }
+      showToast(`Candidate lines: ${val}`, 'info', 1500);
     });
-  });
-  
-  document.querySelectorAll('input[name="active-color"]').forEach(radio => {
-    radio.addEventListener('change', () => {
-      if (state.mode === 'setup' && state.setupController) {
-        state.setupController.updateActiveColor(radio.value);
-      }
+  }
+  if (els.ttsSpeedInput) {
+    els.ttsSpeedInput.value = state.settings.ttsSpeed || 1.0;
+    els.ttsSpeedInput.addEventListener('input', (e) => {
+      const rate = parseFloat(e.target.value) || 1.0;
+      state.settings.ttsSpeed = rate;
+      setRate(rate);
+      saveSettings();
     });
-  });
+  }
 
   // Command Input (Text Box)
   if (els.commandInput && els.commandSubmitBtn) {
@@ -929,38 +875,22 @@ function bindEvents() {
     els.pttBtn.addEventListener('pointerleave', handlePttEnd);
     els.pttBtn.addEventListener('pointercancel', handlePttEnd);
   }
-
-  // Tab Switching
-  document.querySelectorAll('.tab-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const tab = btn.getAttribute('data-tab');
-      if (tab) switchTab(tab);
+  // Window Resize & Orientation
+  let resizeRaf = null;
+  const debouncedResize = () => {
+    if (resizeRaf) cancelAnimationFrame(resizeRaf);
+    resizeRaf = requestAnimationFrame(() => {
+      if (state.ground) state.ground.redrawAll();
     });
-  });
+  };
+  window.addEventListener('resize', debouncedResize, { passive: true });
+  window.addEventListener('orientationchange', () => setTimeout(debouncedResize, 100), { passive: true });
 
-  document.querySelectorAll('.dock-btn[data-dock]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const tab = btn.getAttribute('data-dock');
-      if (tab) switchTab(tab);
-    });
-  });
-
-  // Dock Action Buttons
-  if (els.dockTtsBtn) {
-    els.dockTtsBtn.addEventListener('click', () => {
-      if (els.ttsToggleBtn) els.ttsToggleBtn.click();
-    });
+  if (els.board) {
+    els.board.addEventListener('touchstart', () => {
+      if (state.ground) state.ground.redrawAll();
+    }, { passive: true });
   }
-  if (els.dockHelpBtn) {
-    els.dockHelpBtn.addEventListener('click', () => openHelp());
-  }
-
-  // Window Resize
-  window.addEventListener('resize', () => {
-    if (state.ground) {
-      state.ground.redrawAll();
-    }
-  });
 
   // Free Placement Mode Toggle
   if (els.freeModeBtn) {
@@ -1117,31 +1047,16 @@ async function init() {
       draggable: { enabled: true },
       animation: { enabled: true, duration: 200 },
       coordinates: true,
+      blockTouchScroll: true,
       highlight: { lastMove: true, check: true },
       events: {
         move: handleBoardMove,
         select: handleBoardSelect,
-        change: () => {
-          if (els.fenInput) {
-            els.fenInput.value = getFenFromBoard();
-          }
-        }
       }
     });
+    setTimeout(() => state.ground?.redrawAll(), 60);
     
-    // 3. Initialize Setup Mode Controller
-    state.setupController = await initSetupMode({
-      boardElement: els.board,
-      groundInstance: state.ground,
-      onFenChange: (fen) => {
-        if (els.fenInput) els.fenInput.value = fen;
-      },
-      onValidationChange: (val) => {
-        // Only warn if explicitly trying to enter analysis
-      },
-      piecesPaletteElement: document.querySelector('.piece-palette')
-    });
-    // 4. Initialize Stockfish Engine
+    // 3. Initialize Stockfish Engine
     if (els.engineStatusText) els.engineStatusText.textContent = 'Loading...';
     initEngine({
       onReady: () => {
@@ -1172,16 +1087,16 @@ async function init() {
       onError: (err) => {
         if (els.statusDot) els.statusDot.classList.add('error');
         if (els.engineStatusText) els.engineStatusText.textContent = 'Offline';
-        showToast(`Engine Error: ${err}`, 'error');
+        const msg = err?.message || (typeof err === 'string' ? err : 'Worker failed to load');
+        showToast(`Engine Error: ${msg}`, 'error', 4000);
       }
     }).catch(e => {
       console.error('Stockfish init failed:', e);
       if (els.statusDot) els.statusDot.classList.add('error');
       if (els.engineStatusText) els.engineStatusText.textContent = 'Offline';
-      showToast('Failed to initialize Stockfish engine', 'error');
     });
     
-    // 5. Initialize Voice
+    // 4. Initialize Voice
     try {
       const voiceSupport = await initVoice({
         onMoveRecognized: (san, from, to, promo, parsed) => {
@@ -1225,11 +1140,6 @@ async function init() {
     // Bind events
     bindEvents();
     
-    // Start by explicitly enabling the current mode
-    if (state.mode === 'setup' && state.setupController) {
-      state.setupController.enable();
-    }
-    
     // Finished loading
     showToast('ChessMind ready', 'success');
     
@@ -1239,9 +1149,9 @@ async function init() {
   }
 }
 
-// Start app when DOM is ready
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', init);
-} else {
+// Start app when window and assets are loaded
+if (document.readyState === 'complete') {
   init();
+} else {
+  window.addEventListener('load', init);
 }
