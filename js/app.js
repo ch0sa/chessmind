@@ -221,7 +221,7 @@ function handleClearBoard() {
     fen: '8/8/8/8/8/8/8/8',
     lastMove: null,
     autoShapes: [],
-    movable: { free: true, color: 'both' }
+    movable: { free: true, color: 'both', dests: new Map() }
   });
   if (els.fenInput) els.fenInput.value = state.currentFen;
   if (els.evalBarFill) els.evalBarFill.style.height = '50%';
@@ -246,7 +246,7 @@ function handleResetStartingPosition() {
     fen: STARTING_FEN,
     lastMove: null,
     autoShapes: [],
-    movable: state.freePlacement ? { free: true, color: 'both' } : {
+    movable: state.freePlacement ? { free: true, color: 'both', dests: new Map() } : {
       free: false,
       color: state.chess.turn() === 'w' ? 'white' : 'black',
       dests: getLegalMoves()
@@ -268,7 +268,7 @@ function handleBoardMove(orig, dest) {
       state.ground.set({ 
         fen: state.currentFen, 
         lastMove: [orig, dest],
-        movable: { free: true, color: 'both' }
+        movable: { free: true, color: 'both', dests: new Map() }
       });
       if (els.fenInput) els.fenInput.value = state.currentFen;
       triggerDebouncedAnalysis(250);
@@ -337,7 +337,7 @@ function handlePiecePlacement(color, role, square) {
   state.currentFen = state.chess.fen();
   state.ground.set({
     fen: state.currentFen,
-    movable: state.freePlacement ? { free: true, color: 'both' } : {
+    movable: state.freePlacement ? { free: true, color: 'both', dests: new Map() } : {
       free: false,
       color: state.chess.turn() === 'w' ? 'white' : 'black',
       dests: getLegalMoves(),
@@ -356,7 +356,7 @@ function handlePieceRemoval(square) {
   state.currentFen = state.chess.fen();
   state.ground.set({
     fen: state.currentFen,
-    movable: state.freePlacement ? { free: true, color: 'both' } : {
+    movable: state.freePlacement ? { free: true, color: 'both', dests: new Map() } : {
       free: false,
       color: state.chess.turn() === 'w' ? 'white' : 'black',
       dests: getLegalMoves(),
@@ -612,7 +612,7 @@ async function handleModeToggle() {
     state.ground.set({
       fen: state.chess.fen(),
       movable: state.freePlacement 
-        ? { free: true, color: 'both' } 
+        ? { free: true, color: 'both', dests: new Map() } 
         : {
           free: false,
           color: state.chess.turn() === 'w' ? 'white' : 'black',
@@ -896,7 +896,7 @@ function bindEvents() {
         els.freeModeBtn.classList.add('active');
         els.freeModeBtn.textContent = '✋ Free Move: ON';
         state.ground.set({
-          movable: { free: true, color: 'both' },
+          movable: { free: true, color: 'both', dests: new Map() },
           events: {
             move: handleBoardMove,
             select: handleBoardSelect
@@ -1037,10 +1037,9 @@ async function init() {
     state.ground = ChessgroundClass(els.board, {
       fen: state.currentFen.split(' ')[0],
       orientation: state.boardOrientation,
-      trustAllEvents: true,
       movable: state.mode === 'analysis' 
         ? { free: false, color: state.chess.turn() === 'w' ? 'white' : 'black', dests: getLegalMoves(), showDests: true }
-        : { free: true, color: 'both', showDests: true },
+        : { free: true, color: 'both', dests: new Map(), showDests: true },
       draggable: {
         enabled: true,
         distance: 3,
