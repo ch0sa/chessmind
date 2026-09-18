@@ -108,8 +108,8 @@ button {
 
 /* App Header */
 .app-header {
-  height: var(--header-height);
-  padding: 0 16px;
+  min-height: var(--header-height);
+  padding: env(safe-area-inset-top, 0px) 16px 0 16px;
   display: flex;
   align-items: center;
   justify-content: space-between;
