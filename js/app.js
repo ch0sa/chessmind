@@ -88,6 +88,7 @@ function showToast(message, type = 'info', duration = 3000) {
   toast.style.fontWeight = 'bold';
   toast.style.background = type === 'error' ? '#f44336' : (type === 'success' ? '#4caf50' : '#2196f3');
   toast.style.boxShadow = '0 2px 5px rgba(0,0,0,0.2)';
+  toast.style.pointerEvents = 'none';
   toast.style.opacity = '0';
   toast.style.transform = 'translateY(20px)';
   toast.style.transition = 'opacity 0.3s, transform 0.3s';
@@ -886,11 +887,6 @@ function bindEvents() {
   window.addEventListener('resize', debouncedResize, { passive: true });
   window.addEventListener('orientationchange', () => setTimeout(debouncedResize, 100), { passive: true });
 
-  if (els.board) {
-    els.board.addEventListener('touchstart', () => {
-      if (state.ground) state.ground.redrawAll();
-    }, { passive: true });
-  }
 
   // Free Placement Mode Toggle
   if (els.freeModeBtn) {
@@ -1041,11 +1037,19 @@ async function init() {
     state.ground = ChessgroundClass(els.board, {
       fen: state.currentFen.split(' ')[0],
       orientation: state.boardOrientation,
+      trustAllEvents: true,
       movable: state.mode === 'analysis' 
-        ? { free: false, color: state.chess.turn() === 'w' ? 'white' : 'black', dests: getLegalMoves() }
-        : { free: true, color: 'both' },
-      draggable: { enabled: true },
-      animation: { enabled: true, duration: 200 },
+        ? { free: false, color: state.chess.turn() === 'w' ? 'white' : 'black', dests: getLegalMoves(), showDests: true }
+        : { free: true, color: 'both', showDests: true },
+      draggable: {
+        enabled: true,
+        distance: 3,
+        autoDistance: true,
+        showGhost: true,
+        deleteOnDropOff: false
+      },
+      selectable: { enabled: true },
+      animation: { enabled: true, duration: 180 },
       coordinates: true,
       blockTouchScroll: true,
       highlight: { lastMove: true, check: true },
@@ -1055,6 +1059,7 @@ async function init() {
       }
     });
     setTimeout(() => state.ground?.redrawAll(), 60);
+    window.appState = state;
     
     // 3. Initialize Stockfish Engine
     if (els.engineStatusText) els.engineStatusText.textContent = 'Loading...';

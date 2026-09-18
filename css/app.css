@@ -268,13 +268,31 @@ button {
 }
 
 /* Prevent browser scroll gestures from interrupting drag */
-cg-board, cg-container {
-  touch-action: none;
+.cg-board-wrap, cg-board, cg-container, .cg-wrap piece {
+  touch-action: none !important;
+  -webkit-touch-callout: none !important;
+  -webkit-user-select: none !important;
+  user-select: none !important;
 }
 
 /* Ensure pieces scale perfectly */
 .cg-board-wrap piece {
   background-size: cover;
+}
+
+/* Fluid, responsive piece lift effect on touch / drag */
+cg-board piece.dragging {
+  cursor: grabbing !important;
+  cursor: -webkit-grabbing !important;
+  z-index: 99 !important;
+  filter: drop-shadow(0 14px 22px rgba(0, 0, 0, 0.65)) brightness(1.12);
+  pointer-events: none !important;
+}
+
+/* Semi-transparent ghost piece on origin square */
+.cg-wrap piece.ghost {
+  opacity: 0.38 !important;
+  filter: grayscale(0.4);
 }
 
 /* ==========================================================================
@@ -958,19 +976,19 @@ cg-board, cg-container {
   color: var(--text-main);
 }
 
-/* Toasts - Positioned neatly at top */
+/* Toasts - Positioned neatly at bottom, non-blocking */
 .toast-container {
   position: fixed;
-  top: calc(var(--header-height) + 10px);
+  bottom: 24px;
   left: 50%;
   transform: translateX(-50%);
   width: calc(100% - 32px);
   max-width: 420px;
   display: flex;
-  flex-direction: column;
+  flex-direction: column-reverse;
   gap: 8px;
   z-index: 2000;
-  pointer-events: none;
+  pointer-events: none !important;
 }
 
 .toast {
@@ -981,8 +999,7 @@ cg-board, cg-container {
   color: #ffffff;
   background-color: var(--bg-elevated);
   border: 1px solid var(--border-default);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
-  pointer-events: auto;
+  pointer-events: none !important;
   text-align: center;
   transition: all 0.3s ease;
 }
