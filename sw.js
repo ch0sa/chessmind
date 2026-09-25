@@ -1,5 +1,5 @@
 // ChessMind Service Worker - Offline caching
-const CACHE_NAME = 'chessmind-v17';
+const CACHE_NAME = 'chessmind-v18';
 const ASSETS = [
   '/',
   '/css/app.css',
@@ -9,6 +9,7 @@ const ASSETS = [
   '/js/app.js',
   '/js/analysis.js',
   '/js/sound.js',
+  '/js/openings.js',
   '/js/fen-utils.js',
   '/js/move-parser.js',
   '/js/voice-controller.js',

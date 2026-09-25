@@ -123,6 +123,12 @@
                     </div>
                 </div>
 
+                <!-- Opening Name & ECO Banner -->
+                <div id="opening-bar" class="opening-banner" aria-label="Chess Opening">
+                    <span class="opening-icon">📖</span>
+                    <span id="opening-name" class="opening-text">Starting Position</span>
+                </div>
+
                 <!-- Game Status Bar (for vs-computer and 1v1 modes) -->
                 <div id="game-status-bar" class="game-status-bar hidden">
                     <span id="game-status-text">Your turn (White)</span>
@@ -232,6 +238,9 @@
 
                 <!-- 1-Click Action Buttons -->
                 <div class="quick-actions-bar">
+                    <button id="import-quick-btn" class="action-btn" title="Import game PGN or board FEN">
+                        📥 Import
+                    </button>
                     <button id="clear-board-btn" class="action-btn btn-danger" data-action="clear-board" title="Wipe all pieces from the board">
                         🗑️ Clear Board
                     </button>
@@ -300,6 +309,7 @@
                             <span id="history-move-count" class="history-count-badge">0 moves</span>
                         </div>
                         <div class="history-header-actions">
+                            <button id="import-btn" class="action-btn-xs" title="Import game PGN or board FEN">📥 Import</button>
                             <button id="copy-pgn-btn" class="action-btn-xs" title="Copy game PGN">📋 PGN</button>
                             <button id="copy-fen-btn" class="action-btn-xs" title="Copy current FEN">📋 FEN</button>
                         </div>
@@ -389,10 +399,20 @@
             <div class="modal-body">
                 <div class="settings-form">
                     <div class="setting-row">
-                        <label for="theme-toggle">Theme</label>
+                        <label for="theme-toggle">App Theme</label>
                         <select id="theme-toggle" data-setting="theme">
                             <option value="dark">Dark (Default)</option>
                             <option value="light">Light</option>
+                        </select>
+                    </div>
+                    <div class="setting-row">
+                        <label for="board-theme-select">Board Theme</label>
+                        <select id="board-theme-select" data-setting="board-theme">
+                            <option value="brown" selected>Brown (Classic Wood)</option>
+                            <option value="green">Green (Tournament)</option>
+                            <option value="blue">Blue (Ocean)</option>
+                            <option value="wood">Wood (Walnut)</option>
+                            <option value="charcoal">Charcoal (Dark Slate)</option>
                         </select>
                     </div>
                     <div class="setting-row">
@@ -422,6 +442,26 @@
                         <label for="tts-speed">TTS Speed: <span id="tts-speed-value">1.0</span>x</label>
                         <input type="range" id="tts-speed" min="0.5" max="2.0" step="0.1" value="1.0" data-setting="tts-speed">
                     </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Import PGN / FEN Modal -->
+    <div id="import-modal" class="modal-backdrop hidden" role="dialog" aria-labelledby="import-title">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h2 id="import-title">📥 Import PGN or FEN</h2>
+                <button id="close-import" class="close-btn" aria-label="Close import dialog">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 10px;">
+                    Paste a game in <strong>PGN</strong> format (from Chess.com or Lichess) or a <strong>FEN</strong> position string to analyze offline.
+                </p>
+                <textarea id="import-input" class="import-textarea" rows="6" placeholder="Paste PGN (e.g. 1. e4 e5 2. Nf3 Nc6...) or FEN (e.g. rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1)" aria-label="PGN or FEN string input"></textarea>
+                <div style="display: flex; gap: 8px; margin-top: 12px; justify-content: flex-end;">
+                    <button id="import-clear-btn" class="action-btn btn-sm">Clear</button>
+                    <button id="import-submit-btn" class="action-btn btn-primary btn-sm">▶ Load Position / Game</button>
                 </div>
             </div>
         </div>

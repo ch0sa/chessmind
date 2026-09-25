@@ -16,6 +16,7 @@ import {
   playMoveSound, playCaptureSound, playCheckSound, 
   playCastleSound, playGameEndSound, triggerHaptic 
 } from './sound.js';
+import { identifyOpening } from './openings.js';
 
 const state = {
   mode: 'analysis',          // 'setup' | 'analysis'
@@ -48,6 +49,7 @@ const state = {
   },
   settings: {
     theme: 'dark',
+    boardTheme: 'brown',
     soundEnabled: true,
     depth: (typeof window !== 'undefined' && (window.innerWidth <= 768 || /Android|iPhone|iPad/i.test(navigator.userAgent))) ? 15 : 18,
     analysisSide: 'white',   // 'white' | 'black' | 'auto'
@@ -166,6 +168,26 @@ function applyTheme() {
   document.documentElement.setAttribute('data-theme', state.settings.theme);
 }
 
+function applyBoardTheme(theme) {
+  const validThemes = ['brown', 'green', 'blue', 'wood', 'charcoal'];
+  const selected = validThemes.includes(theme) ? theme : 'brown';
+  state.settings.boardTheme = selected;
+
+  const boardEl = document.getElementById('board') || document.querySelector('.board-container');
+  if (boardEl) {
+    validThemes.forEach(t => boardEl.classList.remove(`board-theme-${t}`));
+    boardEl.classList.add(`board-theme-${selected}`);
+  }
+  if (document.body) {
+    validThemes.forEach(t => document.body.classList.remove(`board-theme-${t}`));
+    document.body.classList.add(`board-theme-${selected}`);
+  }
+
+  if (els.boardThemeSelect) {
+    els.boardThemeSelect.value = selected;
+  }
+}
+
 function initDOM() {
   els.board = document.getElementById('board');
   els.analyzeBtn = document.getElementById('analyze-btn');
@@ -209,11 +231,15 @@ function initDOM() {
   els.historyMoveCount = document.getElementById('history-move-count');
   els.copyPgnBtn = document.getElementById('copy-pgn-btn');
   els.copyFenBtn = document.getElementById('copy-fen-btn');
+  els.importBtn = document.getElementById('import-btn');
+  els.importQuickBtn = document.getElementById('import-quick-btn');
   els.navFirstBtn = document.getElementById('nav-first-btn');
   els.navPrevBtn = document.getElementById('nav-prev-btn');
   els.navNextBtn = document.getElementById('nav-next-btn');
   els.navLastBtn = document.getElementById('nav-last-btn');
   els.navLiveBadge = document.getElementById('nav-live-badge');
+  els.openingBar = document.getElementById('opening-bar');
+  els.openingName = document.getElementById('opening-name');
   
   // Game Mode & Play Controls
   els.modeSelectorBtns = document.querySelectorAll('.mode-btn');
@@ -250,6 +276,14 @@ function initDOM() {
   els.helpBtn = document.getElementById('help-btn');
   els.helpModal = document.getElementById('help-modal');
   els.closeHelpBtn = document.getElementById('close-help');
+
+  // Board Theme & Import Modal
+  els.boardThemeSelect = document.getElementById('board-theme-select');
+  els.importModal = document.getElementById('import-modal');
+  els.closeImportBtn = document.getElementById('close-import');
+  els.importInput = document.getElementById('import-input');
+  els.importSubmitBtn = document.getElementById('import-submit-btn');
+  els.importClearBtn = document.getElementById('import-clear-btn');
 
   // Status elements
   els.statusDot = document.getElementById('status-dot');
@@ -675,6 +709,17 @@ function handleMoveExecution(parsed) {
 function processUserCommandOrMove(rawInput) {
   if (!rawInput || !rawInput.trim()) return;
   const input = rawInput.trim();
+
+  // Direct SAN move check (e.g. 'Nf3', 'Nxd4', 'O-O', 'exd5', 'e4')
+  if (state.chess) {
+    const legalMoves = state.chess.moves();
+    const matched = legalMoves.find(m => m.toLowerCase() === input.toLowerCase() || m === input);
+    if (matched) {
+      handleMoveExecution({ san: matched });
+      return;
+    }
+  }
+
   const parsed = parseSpokenMove(input);
 
   if (parsed.type === 'command') {
@@ -1239,6 +1284,7 @@ function recordMoveInHistory(move) {
 
   state.currentHistoryIndex = state.historyMoves.length - 1;
   renderMoveHistoryUI();
+  updateOpeningUI();
 }
 
 function renderMoveHistoryUI() {
@@ -1342,6 +1388,7 @@ function goToHistoryIndex(idx) {
   }
 
   renderMoveHistoryUI();
+  updateOpeningUI();
 }
 
 function copyPgnToClipboard() {
@@ -1380,6 +1427,169 @@ function copyFenToClipboard() {
   } catch (e) {
     showToast('Failed to copy FEN', 'error', 2000);
   }
+}
+
+// Opening Recognition Display
+function updateOpeningUI() {
+  if (!els.openingBar || !els.openingName) return;
+
+  if (!state.chess || state.historyMoves.length === 0 || state.currentHistoryIndex === -1) {
+    els.openingName.textContent = 'Starting Position';
+    return;
+  }
+
+  const activeMoves = state.historyMoves.slice(0, state.currentHistoryIndex + 1);
+  const opening = identifyOpening(activeMoves);
+  if (opening) {
+    els.openingName.textContent = `${opening.eco} ${opening.name}`;
+    els.openingBar.classList.remove('hidden');
+  } else {
+    if (activeMoves.length <= 2) {
+      els.openingName.textContent = 'Standard Opening';
+    } else {
+      els.openingName.textContent = 'Custom Position';
+    }
+  }
+}
+
+// PGN / FEN Import Dialog
+function openImportModal() {
+  if (els.importModal) {
+    els.importModal.classList.remove('hidden');
+    if (els.importInput) {
+      els.importInput.value = '';
+      els.importInput.focus();
+    }
+  }
+}
+
+function closeImportModal() {
+  if (els.importModal) {
+    els.importModal.classList.add('hidden');
+  }
+}
+
+function handleImportData() {
+  if (!els.importInput) return;
+  const raw = els.importInput.value.trim();
+  if (!raw) {
+    showToast('Please paste a PGN or FEN first', 'warning', 2500);
+    return;
+  }
+
+  // 1. Try FEN detection first
+  const isFenLike = /^\s*([rnbqkbnr1-8\/]+)\s+([wb])\s+([kq-]+)\s+([a-h1-8-]+)/i.test(raw) ||
+                    (raw.split(' ').length <= 6 && raw.includes('/'));
+
+  if (isFenLike) {
+    const validation = validateFen(raw);
+    if (validation.valid) {
+      stopAnalysis();
+      stopClock();
+      state.chess = new Chess(raw);
+      state.currentFen = state.chess.fen();
+      state.historyMoves = [];
+      state.currentHistoryIndex = -1;
+      state.isGameOver = state.chess.isGameOver ? state.chess.isGameOver() : false;
+
+      const activeColor = state.chess.turn() === 'w' ? 'white' : 'black';
+      state.ground.set({
+        fen: state.currentFen,
+        lastMove: null,
+        turnColor: activeColor,
+        movable: {
+          free: false,
+          color: activeColor,
+          dests: getLegalMoves(),
+          showDests: true
+        }
+      });
+
+      if (els.fenInput) els.fenInput.value = state.currentFen;
+      renderMoveHistoryUI();
+      updatePlayerStripsUI();
+      updateOpeningUI();
+      closeImportModal();
+      showToast('FEN position imported successfully! ♟️', 'success', 2500);
+
+      if (state.gameMode !== 'analysis') {
+        switchGameMode('analysis');
+      } else {
+        triggerDebouncedAnalysis(200);
+      }
+      return;
+    }
+  }
+
+  // 2. Try PGN detection
+  try {
+    const testChess = new Chess();
+    testChess.loadPgn(raw);
+    const history = testChess.history({ verbose: true });
+    if (history && history.length > 0) {
+      stopAnalysis();
+      stopClock();
+      
+      state.chess = new Chess();
+      state.historyMoves = [];
+      state.currentHistoryIndex = -1;
+
+      for (const m of history) {
+        const played = state.chess.move(m);
+        if (played) {
+          state.historyMoves.push({
+            san: played.san,
+            from: played.from,
+            to: played.to,
+            piece: played.piece,
+            flags: played.flags,
+            fen: state.chess.fen(),
+            color: played.color,
+            turn: state.chess.turn()
+          });
+        }
+      }
+
+      state.currentHistoryIndex = state.historyMoves.length - 1;
+      state.currentFen = state.chess.fen();
+      state.isGameOver = state.chess.isGameOver ? state.chess.isGameOver() : false;
+
+      const lastMove = state.historyMoves.length > 0 
+        ? [state.historyMoves[state.historyMoves.length - 1].from, state.historyMoves[state.historyMoves.length - 1].to] 
+        : null;
+      const activeColor = state.chess.turn() === 'w' ? 'white' : 'black';
+
+      state.ground.set({
+        fen: state.currentFen,
+        lastMove,
+        turnColor: activeColor,
+        movable: {
+          free: false,
+          color: state.isGameOver ? undefined : activeColor,
+          dests: state.isGameOver ? new Map() : getLegalMoves(),
+          showDests: true
+        }
+      });
+
+      if (els.fenInput) els.fenInput.value = state.currentFen;
+      renderMoveHistoryUI();
+      updatePlayerStripsUI();
+      updateOpeningUI();
+      closeImportModal();
+      showToast(`Imported game with ${state.historyMoves.length} moves! 📜`, 'success', 3000);
+
+      if (state.gameMode !== 'analysis') {
+        switchGameMode('analysis');
+      } else {
+        triggerDebouncedAnalysis(200);
+      }
+      return;
+    }
+  } catch (e) {
+    console.warn('PGN parse error:', e);
+  }
+
+  showToast('Could not recognize format. Please paste a valid PGN or FEN.', 'error', 3500);
 }
 
 const DIFFICULTY_DEPTHS = { 1: 3, 2: 6, 3: 10, 4: 15, 5: 20, 6: 25 };
@@ -1472,6 +1682,7 @@ function startNewGame(mode) {
   }
 
   updatePlayerStripsUI();
+  updateOpeningUI();
 
   if (mode === 'vs-computer') {
     let color = els.playAsColor ? els.playAsColor.value : 'white';
@@ -1821,6 +2032,36 @@ function bindEvents() {
   }
   if (els.copyFenBtn) {
     els.copyFenBtn.addEventListener('click', copyFenToClipboard);
+  }
+  if (els.importBtn) {
+    els.importBtn.addEventListener('click', openImportModal);
+  }
+  if (els.importQuickBtn) {
+    els.importQuickBtn.addEventListener('click', openImportModal);
+  }
+  if (els.closeImportBtn) {
+    els.closeImportBtn.addEventListener('click', closeImportModal);
+  }
+  if (els.importSubmitBtn) {
+    els.importSubmitBtn.addEventListener('click', handleImportData);
+  }
+  if (els.importClearBtn) {
+    els.importClearBtn.addEventListener('click', () => {
+      if (els.importInput) els.importInput.value = '';
+    });
+  }
+  if (els.importModal) {
+    els.importModal.addEventListener('click', (e) => {
+      if (e.target === els.importModal) closeImportModal();
+    });
+  }
+  if (els.boardThemeSelect) {
+    els.boardThemeSelect.value = state.settings.boardTheme || 'brown';
+    els.boardThemeSelect.addEventListener('change', (e) => {
+      applyBoardTheme(e.target.value);
+      saveSettings();
+      showToast(`Board Theme: ${e.target.options[e.target.selectedIndex].text}`, 'info', 1500);
+    });
   }
 
   // Keyboard navigation for Move History (ArrowLeft, ArrowRight, Home, End)
@@ -2210,11 +2451,13 @@ async function init() {
     setTimeout(() => state.ground?.redrawAll(), 60);
     window.appState = state;
     
-    // Initialize Sound, Player Strips, and Move History
+    // Initialize Sound, Player Strips, Move History, Opening & Board Theme
     initSound(state.settings.soundEnabled !== false);
     updateSoundUI();
     updatePlayerStripsUI();
     renderMoveHistoryUI();
+    updateOpeningUI();
+    applyBoardTheme(state.settings.boardTheme || 'brown');
 
     // 3. Initialize Stockfish Engine
     if (els.engineStatusText) els.engineStatusText.textContent = 'Loading...';

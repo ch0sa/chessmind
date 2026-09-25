@@ -1304,3 +1304,92 @@ cg-board piece.dragging {
 .nav-live-btn.hidden {
   display: none;
 }
+
+/* ==========================================================================
+   Phase 3: Opening Banner, Board Themes & Import Modal
+   ========================================================================== */
+
+/* Opening Name Banner */
+.opening-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  margin-top: 6px;
+  font-size: 0.85rem;
+  color: var(--text-primary);
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.opening-banner .opening-icon {
+  font-size: 1rem;
+}
+
+.opening-banner .opening-text {
+  color: var(--accent-emerald);
+  font-weight: 600;
+}
+
+.opening-banner.hidden {
+  display: none;
+}
+
+/* Board Themes */
+.board-theme-brown cg-board {
+  background-color: #f0d9b5 !important;
+}
+
+.board-theme-green cg-board {
+  background-color: #eeeed2 !important;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 2 2'%3E%3Crect width='1' height='1' fill='%23eeeed2'/%3E%3Crect width='1' height='1' x='1' y='1' fill='%23eeeed2'/%3E%3Crect width='1' height='1' x='1' fill='%23769656'/%3E%3Crect width='1' height='1' y='1' fill='%23769656'/%3E%3C/svg%3E") !important;
+  background-size: 25% 25% !important;
+  background-repeat: repeat !important;
+}
+
+.board-theme-blue cg-board {
+  background-color: #dee3e6 !important;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 2 2'%3E%3Crect width='1' height='1' fill='%23dee3e6'/%3E%3Crect width='1' height='1' x='1' y='1' fill='%23dee3e6'/%3E%3Crect width='1' height='1' x='1' fill='%238ca2ad'/%3E%3Crect width='1' height='1' y='1' fill='%238ca2ad'/%3E%3C/svg%3E") !important;
+  background-size: 25% 25% !important;
+  background-repeat: repeat !important;
+}
+
+.board-theme-wood cg-board {
+  background-color: #e4c896 !important;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 2 2'%3E%3Crect width='1' height='1' fill='%23e4c896'/%3E%3Crect width='1' height='1' x='1' y='1' fill='%23e4c896'/%3E%3Crect width='1' height='1' x='1' fill='%23a06c3a'/%3E%3Crect width='1' height='1' y='1' fill='%23a06c3a'/%3E%3C/svg%3E") !important;
+  background-size: 25% 25% !important;
+  background-repeat: repeat !important;
+}
+
+.board-theme-charcoal cg-board {
+  background-color: #94a3b8 !important;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 2 2'%3E%3Crect width='1' height='1' fill='%2394a3b8'/%3E%3Crect width='1' height='1' x='1' y='1' fill='%2394a3b8'/%3E%3Crect width='1' height='1' x='1' fill='%23475569'/%3E%3Crect width='1' height='1' y='1' fill='%23475569'/%3E%3C/svg%3E") !important;
+  background-size: 25% 25% !important;
+  background-repeat: repeat !important;
+}
+
+/* Import Modal */
+.import-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  padding: 10px;
+  font-family: ui-monospace, SFMono-Regular, "Roboto Mono", Menlo, Consolas, monospace;
+  font-size: 0.85rem;
+  resize: vertical;
+  min-height: 120px;
+  line-height: 1.4;
+}
+
+.import-textarea:focus {
+  outline: none;
+  border-color: var(--accent-emerald);
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
+}
+
