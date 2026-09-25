@@ -648,61 +648,103 @@ function handleMoveExecution(parsed) {
     return;
   }
 
-  if (parsed.san || (parsed.role && parsed.to)) {
-    try {
-      const move = state.chess.move(parsed.san || { to: parsed.to });
-      if (move) {
-        state.currentFen = state.chess.fen();
-        state.analysisPaused = false;
-        const activeColor = state.chess.turn() === 'w' ? 'white' : 'black';
-        state.ground.set({
-          fen: state.currentFen,
-          lastMove: [move.from, move.to],
-          turnColor: activeColor,
-          movable: state.freePlacement ? { free: true, color: 'both', dests: new Map() } : {
-            free: false,
-            color: (state.gameMode === 'vs-computer') ? (state.isGameOver ? undefined : state.playerColor) : activeColor,
-            dests: state.isGameOver ? new Map() : getLegalMoves(),
-            showDests: true
-          }
+  if (parsed.san || (parsed.role && parsed.to) || (parsed.fromFile && parsed.to)) {
+    let move = null;
+
+    // 1. Try direct SAN string
+    if (parsed.san) {
+      try {
+        move = state.chess.move(parsed.san);
+      } catch (e) {}
+    }
+
+    // 2. Candidate legal move matching by role / file / to square
+    if (!move && state.chess) {
+      try {
+        const roleToPiece = {
+          pawn: 'p',
+          knight: 'n',
+          bishop: 'b',
+          rook: 'r',
+          queen: 'q',
+          king: 'k'
+        };
+        const targetPiece = parsed.role ? roleToPiece[parsed.role.toLowerCase()] : null;
+        const verboseMoves = state.chess.moves({ verbose: true });
+        const candidate = verboseMoves.find(m => {
+          const matchPiece = targetPiece ? m.piece === targetPiece : true;
+          const matchTo = parsed.to ? m.to === parsed.to.toLowerCase() : true;
+          const matchFromFile = parsed.fromFile ? m.from.startsWith(parsed.fromFile.toLowerCase()) : true;
+          return matchPiece && matchTo && matchFromFile;
         });
-        if (els.fenInput) els.fenInput.value = state.currentFen;
-        showToast(`Move made: ${move.san}`, 'success', 1500);
 
-        // Play sound, record history, update captured material
-        playMoveSoundFx(move);
-        recordMoveInHistory(move);
-        updatePlayerStripsUI();
-
-        if (isTTSEnabled()) {
-          speak(formatMoveForSpeech(move.san, move.piece, move.from, move.to, move.flags));
-        }
-
-        if (state.gameMode === 'vs-computer') {
-          updateGameStatus();
-          if (!state.isGameOver) {
-            makeComputerMove();
-          }
-          return;
-        }
-
-        if (state.gameMode === 'local-1v1') {
-          updateGameStatus();
-          return;
-        }
-
-        if (state.engineReady && !state.analysisPaused) {
-          startAnalysis(state.currentFen, {
-            depth: state.settings.depth,
-            multiPV: state.settings.multiPV,
-            threads: state.settings.threads
+        if (candidate) {
+          move = state.chess.move({
+            from: candidate.from,
+            to: candidate.to,
+            promotion: parsed.promotion || 'q'
           });
+        }
+      } catch (e) {}
+    }
+
+    if (move) {
+      state.currentFen = state.chess.fen();
+      state.analysisPaused = false;
+      const activeColor = state.chess.turn() === 'w' ? 'white' : 'black';
+      state.ground.set({
+        fen: state.currentFen,
+        lastMove: [move.from, move.to],
+        turnColor: activeColor,
+        movable: state.freePlacement ? { free: true, color: 'both', dests: new Map() } : {
+          free: false,
+          color: (state.gameMode === 'vs-computer') ? (state.isGameOver ? undefined : state.playerColor) : activeColor,
+          dests: state.isGameOver ? new Map() : getLegalMoves(),
+          showDests: true
+        }
+      });
+      if (els.fenInput) els.fenInput.value = state.currentFen;
+      showToast(`Move made: ${move.san}`, 'success', 1500);
+
+      // Play sound, record history, update captured material
+      playMoveSoundFx(move);
+      recordMoveInHistory(move);
+      updatePlayerStripsUI();
+
+      if (state.clock.enabled && !state.isGameOver) {
+        const nextColor = state.chess.turn() === 'w' ? 'white' : 'black';
+        const movedColor = move.color === 'w' ? 'white' : 'black';
+        switchClockTurn(nextColor, movedColor);
+      }
+
+      if (isTTSEnabled()) {
+        speak(formatMoveForSpeech(move.san, move.piece, move.from, move.to, move.flags));
+      }
+
+      if (state.gameMode === 'vs-computer') {
+        updateGameStatus();
+        if (!state.isGameOver) {
+          makeComputerMove();
         }
         return;
       }
-    } catch (e) {}
 
-    showToast(`Cannot make move ${parsed.san || parsed.raw}. Make sure it is legal on this turn.`, 'warning', 3000);
+      if (state.gameMode === 'local-1v1') {
+        updateGameStatus();
+        return;
+      }
+
+      if (state.engineReady && !state.analysisPaused) {
+        startAnalysis(state.currentFen, {
+          depth: state.settings.depth,
+          multiPV: state.settings.multiPV,
+          threads: state.settings.threads
+        });
+      }
+      return;
+    }
+
+    showToast(`Cannot make move ${parsed.san || parsed.raw || 'requested'}. Ensure it is legal on this turn.`, 'warning', 3000);
   }
 }
 
@@ -2219,32 +2261,107 @@ function bindEvents() {
     });
   }
 
-  // Push-To-Talk (Hold to Speak)
+  // Push-To-Talk & Tap-to-Talk (Hold or Tap to Speak)
   if (els.pttBtn) {
     let pttActive = false;
+    let pressStartTime = 0;
+    let isHoldMode = false;
+    let activePointerId = null;
 
-    const handlePttStart = (e) => {
-      e.preventDefault();
-      if (pttActive) return;
-      pttActive = true;
-      const started = startPushToTalk();
+    const setListeningUI = () => {
       els.pttBtn.classList.add('recording');
-      els.pttBtn.innerHTML = '<span class="icon">🔴</span> <span class="label">Listening...</span>';
+      els.pttBtn.classList.remove('processing');
+      els.pttBtn.innerHTML = '<span class="icon">🔴</span> <span class="label">Listening... (Speak or Tap to Stop)</span>';
     };
 
-    const handlePttEnd = (e) => {
-      e.preventDefault();
+    const setIdleUI = () => {
+      pttActive = false;
+      isHoldMode = false;
+      activePointerId = null;
+      els.pttBtn.classList.remove('recording');
+      els.pttBtn.classList.remove('processing');
+      els.pttBtn.innerHTML = '<span class="icon">🎙️</span> <span class="label">Hold to Speak Move</span>';
+    };
+
+    const setProcessingUI = () => {
+      els.pttBtn.classList.remove('recording');
+      els.pttBtn.classList.add('processing');
+      els.pttBtn.innerHTML = '<span class="icon">⚡</span> <span class="label">Processing Move...</span>';
+    };
+
+    const stopRecording = () => {
       if (!pttActive) return;
       pttActive = false;
-      stopPushToTalk();
-      els.pttBtn.classList.remove('recording');
-      els.pttBtn.innerHTML = '<span class="icon">🎙️</span> <span class="label">Hold to Speak</span>';
+      isHoldMode = false;
+      activePointerId = null;
+      setProcessingUI();
+      stopPushToTalk(false);
+      setTimeout(setIdleUI, 1200);
     };
 
-    els.pttBtn.addEventListener('pointerdown', handlePttStart);
-    els.pttBtn.addEventListener('pointerup', handlePttEnd);
-    els.pttBtn.addEventListener('pointerleave', handlePttEnd);
-    els.pttBtn.addEventListener('pointercancel', handlePttEnd);
+    const handlePointerDown = (e) => {
+      e.preventDefault();
+      // If already active in tap-mode, tapping again stops it
+      if (pttActive && !isHoldMode) {
+        stopRecording();
+        return;
+      }
+
+      pressStartTime = Date.now();
+      isHoldMode = false;
+      activePointerId = e.pointerId;
+
+      try {
+        els.pttBtn.setPointerCapture(e.pointerId);
+      } catch (err) {}
+
+      pttActive = true;
+      startPushToTalk();
+      setListeningUI();
+
+      // Check if user continues holding after 350ms (Hold mode)
+      setTimeout(() => {
+        if (pttActive && activePointerId !== null) {
+          isHoldMode = true;
+        }
+      }, 350);
+    };
+
+    const handlePointerUp = (e) => {
+      e.preventDefault();
+      if (!pttActive) return;
+
+      if (activePointerId !== null) {
+        try {
+          els.pttBtn.releasePointerCapture(activePointerId);
+        } catch (err) {}
+        activePointerId = null;
+      }
+
+      const duration = Date.now() - pressStartTime;
+      if (duration < 350 && !isHoldMode) {
+        // Quick tap: stay in listening mode!
+        // User can now speak hands-free, and tap button again when finished
+        isHoldMode = false;
+        setListeningUI();
+      } else {
+        // Held down and released: finish push-to-talk
+        stopRecording();
+      }
+    };
+
+    els.pttBtn.addEventListener('pointerdown', handlePointerDown);
+    els.pttBtn.addEventListener('pointerup', handlePointerUp);
+    els.pttBtn.addEventListener('pointercancel', (e) => {
+      e.preventDefault();
+      if (pttActive && isHoldMode) {
+        stopRecording();
+      }
+    });
+    els.pttBtn.addEventListener('contextmenu', (e) => e.preventDefault());
+
+    // Export UI reset callback for voice controller
+    window._resetVoiceButtonUI = setIdleUI;
   }
   // Window Resize & Orientation
   let resizeRaf = null;
@@ -2450,6 +2567,7 @@ async function init() {
     });
     setTimeout(() => state.ground?.redrawAll(), 60);
     window.appState = state;
+    window.processUserCommandOrMove = processUserCommandOrMove;
     
     // Initialize Sound, Player Strips, Move History, Opening & Board Theme
     initSound(state.settings.soundEnabled !== false);
@@ -2502,6 +2620,13 @@ async function init() {
     // 4. Initialize Voice
     try {
       const voiceSupport = await initVoice({
+        onRawTranscript: (rawText) => {
+          showToast(`🎤 Heard: "${rawText}"`, 'info', 2000);
+          processUserCommandOrMove(rawText);
+          if (window._resetVoiceButtonUI) {
+            window._resetVoiceButtonUI();
+          }
+        },
         onMoveRecognized: (san, from, to, promo, parsed) => {
           handleMoveExecution(parsed || { san, from, to, promotion: promo });
         },
@@ -2528,7 +2653,19 @@ async function init() {
             }
           }
         },
-        onError: (err) => showToast(`Voice Error: ${err}`, 'warning')
+        onError: (err, errCode) => {
+          if (window._resetVoiceButtonUI) window._resetVoiceButtonUI();
+          if (errCode === 'not-allowed') {
+            showToast('Microphone access blocked. Tap the lock icon in the address bar to allow microphone.', 'error', 5000);
+          } else {
+            showToast(`Voice Error: ${err}`, 'warning', 3500);
+          }
+        },
+        onStatusChange: (status) => {
+          if (status === 'idle' && window._resetVoiceButtonUI) {
+            window._resetVoiceButtonUI();
+          }
+        }
       });
       state.voiceSupported = voiceSupport;
     } catch (e) {

@@ -9,20 +9,49 @@
     <meta name="theme-color" content="#0d1117">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>♞</text></svg>">
 
+    <!-- Critical Baseline & Anti-FOUC CSS -->
+    <style>
+      body {
+        margin: 0;
+        background-color: #0d1117;
+        color: #f0f6fc;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        -webkit-tap-highlight-color: transparent;
+      }
+      .hidden { display: none !important; }
+      .modal-backdrop.hidden { display: none !important; }
+      .mode-panel.hidden { display: none !important; }
+      .material-diff-badge.hidden { display: none !important; }
+      .player-clock.hidden { display: none !important; }
+      .opening-banner.hidden { display: none !important; }
+      .game-status-bar.hidden { display: none !important; }
+    </style>
+
     <!-- Chessground CSS (Local & Offline) -->
-    <link rel="stylesheet" href="css/chessground.base.css?v=16">
-    <link rel="stylesheet" href="css/chessground.brown.css?v=16">
-    <link rel="stylesheet" href="css/chessground.cburnett.css?v=16">
+    <link rel="stylesheet" href="css/chessground.base.css">
+    <link rel="stylesheet" href="css/chessground.brown.css">
+    <link rel="stylesheet" href="css/chessground.cburnett.css">
     
     <!-- Modern App CSS -->
-    <link rel="stylesheet" href="css/app.css?v=16">
+    <link rel="stylesheet" href="css/app.css">
     
-    <!-- Service Worker Registration -->
+    <!-- Service Worker Registration & Live Sync -->
     <script>
       if ('serviceWorker' in navigator) {
+        let refreshing = false;
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          if (!refreshing) {
+            refreshing = true;
+            window.location.reload();
+          }
+        });
+
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('./sw.js?v=16')
-            .then(reg => console.log('SW registered:', reg.scope))
+          navigator.serviceWorker.register('./sw.js')
+            .then(reg => {
+              console.log('SW registered:', reg.scope);
+              reg.update();
+            })
             .catch(err => console.warn('SW registration failed:', err));
         });
       }

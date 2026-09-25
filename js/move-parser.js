@@ -64,13 +64,12 @@ const CORRECTIONS = [
 
     // Ranks (1-8)
     [/\bwon\b/g, '1'],
-    [/\bone\b/g, '1'],
-    [/\b([a-h])\s+to\b/g, '$1 2'],
+    [/\b([a-h])\s+to\b(?!\s+(?:[a-h][1-8]|[a-h]|takes))/g, '$1 2'],
     [/\btoo\b/g, '2'],
     [/\btwo\b/g, '2'],
     [/\btree\b/g, '3'],
     [/\bthree\b/g, '3'],
-    [/\b([a-h])\s+for\b/g, '$1 4'],
+    [/\b([a-h])\s+for\b(?!\s+(?:[a-h][1-8]|[a-h]|takes))/g, '$1 4'],
     [/\bfour\b/g, '4'],
     [/\bfore\b/g, '4'],
     [/\bfive\b/g, '5'],
@@ -264,6 +263,19 @@ function matchMove(text) {
         let e = getEnding(m[4]);
         if (p) {
             return { san: `${f}x${s}=${p}${e}`, fromFile: f, to: s, promotion: p.toLowerCase() };
+        }
+    }
+
+    // 8b. File to square (pawn move): "c to c5" -> "c c5", "e to e4" -> "e e4", "e to d5" -> "e d5"
+    m = t.match(new RegExp(`^(?:pawn\\s+)?([a-h])\\s+([a-h][1-8])${ending}$`));
+    if (m) {
+        let f = m[1];
+        let s = m[2];
+        let e = getEnding(m[3]);
+        if (s.startsWith(f)) {
+            return { san: `${s}${e}`, to: s, role: 'pawn' };
+        } else {
+            return { san: `${f}x${s}${e}`, fromFile: f, to: s, role: 'pawn' };
         }
     }
 

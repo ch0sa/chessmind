@@ -81,6 +81,7 @@ export function initVoice(options = {}) {
     onErrorCallback = options.onError || null;
     onStatusChangeCallback = options.onStatusChange || null;
     onTranscriptCallback = options.onTranscript || null;
+    const onRawTranscriptCallback = options.onRawTranscript || null;
 
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     const sttSupported = !!SpeechRecognition;
@@ -88,7 +89,7 @@ export function initVoice(options = {}) {
     
     if (sttSupported) {
         recognition = new SpeechRecognition();
-        recognition.continuous = true;
+        recognition.continuous = false;
         recognition.interimResults = true;
         recognition.lang = 'en-US';
 
@@ -114,48 +115,56 @@ export function initVoice(options = {}) {
             }
 
             if (finalTranscript) {
+                const textTrimmed = finalTranscript.trim();
                 if (onTranscriptCallback) {
-                    onTranscriptCallback(finalTranscript, true);
+                    onTranscriptCallback(textTrimmed, true);
                 }
                 
                 setStatus('processing');
                 
-                // Parse the spoken text
-                const parsedResult = parseSpokenMove(finalTranscript.trim());
-                
-                if (parsedResult) {
-                    if (parsedResult.type === 'move' && onMoveRecognizedCallback) {
-                        onMoveRecognizedCallback(parsedResult.san, parsedResult.from, parsedResult.to, parsedResult.promotion, parsedResult);
-                    } else if (parsedResult.type === 'command' && onCommandRecognizedCallback) {
-                        onCommandRecognizedCallback(parsedResult.command, parsedResult);
-                    } else if ((parsedResult.type === 'setup' || parsedResult.type === 'placement' || parsedResult.type === 'remove') && onSetupCommandCallback) {
-                        onSetupCommandCallback(parsedResult.action, parsedResult);
-                    } else if (parsedResult.type === 'unknown' && options.onUnknown) {
-                        options.onUnknown(parsedResult.raw);
+                // If caller provided a unified raw handler, dispatch it
+                if (onRawTranscriptCallback) {
+                    onRawTranscriptCallback(textTrimmed);
+                } else {
+                    // Default parsing
+                    const parsedResult = parseSpokenMove(textTrimmed);
+                    if (parsedResult) {
+                        if (parsedResult.type === 'move' && onMoveRecognizedCallback) {
+                            onMoveRecognizedCallback(parsedResult.san, parsedResult.from, parsedResult.to, parsedResult.promotion, parsedResult);
+                        } else if (parsedResult.type === 'command' && onCommandRecognizedCallback) {
+                            onCommandRecognizedCallback(parsedResult.command, parsedResult);
+                        } else if ((parsedResult.type === 'setup' || parsedResult.type === 'placement' || parsedResult.type === 'remove') && onSetupCommandCallback) {
+                            onSetupCommandCallback(parsedResult.action, parsedResult);
+                        } else if (parsedResult.type === 'unknown' && options.onUnknown) {
+                            options.onUnknown(parsedResult.raw);
+                        }
                     }
                 }
                 
-                // Return to listening state after processing
-                if (shouldBeListening) {
+                // Return to listening state only if continuous listening is desired
+                if (shouldBeListening && !isPttSession) {
                     setStatus('listening');
+                } else {
+                    setStatus('idle');
                 }
             }
         };
 
         recognition.onerror = (event) => {
             if (event.error === 'no-speech') {
-                // Ignore, will auto-restart if continuous
                 return;
             }
             
             isCurrentlyListening = false;
+            isPttSession = false;
+            shouldBeListening = false;
             setStatus('error');
             
             let errorMessage = `Speech recognition error: ${event.error}`;
             if (event.error === 'audio-capture') {
-                errorMessage = 'No microphone was found. Ensure that a microphone is installed and that microphone settings are configured correctly.';
+                errorMessage = 'No microphone was found. Please ensure your microphone is plugged in and enabled.';
             } else if (event.error === 'not-allowed') {
-                errorMessage = 'Permission to use microphone is blocked. Please allow microphone access.';
+                errorMessage = 'Microphone permission blocked. Please allow microphone access in your browser address bar.';
             }
             
             if (onErrorCallback) {
@@ -166,15 +175,21 @@ export function initVoice(options = {}) {
         recognition.onend = () => {
             isCurrentlyListening = false;
             
-            // Auto-restart if we're supposed to be listening
+            if (isPttSession) {
+                isPttSession = false;
+                shouldBeListening = false;
+                setStatus('idle');
+                return;
+            }
+
+            // Auto-restart only if continuous mode was active
             if (shouldBeListening && currentStatus !== 'error') {
                 try {
                     recognition.start();
                 } catch (e) {
-                    console.error('Failed to restart speech recognition:', e);
-                    setStatus('error');
+                    setStatus('idle');
                 }
-            } else if (!shouldBeListening) {
+            } else {
                 setStatus('idle');
             }
         };
@@ -182,9 +197,8 @@ export function initVoice(options = {}) {
 
     // Attempt to load voices early
     if (ttsSupported) {
-        // In some browsers, voices are loaded asynchronously
         window.speechSynthesis.onvoiceschanged = () => {
-            getAvailableVoices(); // Force load
+            getAvailableVoices();
         };
     }
     
@@ -202,6 +216,9 @@ export function initVoice(options = {}) {
     };
 }
 
+let isPttSession = false;
+let pttStopTimer = null;
+
 /**
  * Starts listening for speech.
  * @returns {boolean} True if successful, false otherwise.
@@ -210,9 +227,11 @@ export function startListening() {
     if (!recognition) return false;
     
     shouldBeListening = true;
+    isPttSession = false;
     
     if (!isCurrentlyListening) {
         try {
+            recognition.continuous = true;
             recognition.start();
             return true;
         } catch (e) {
@@ -229,6 +248,7 @@ export function startListening() {
  */
 export function stopListening() {
     shouldBeListening = false;
+    isPttSession = false;
     if (recognition && isCurrentlyListening) {
         recognition.stop();
     }
@@ -250,48 +270,62 @@ export function isListening() {
  */
 export function startPushToTalk() {
     if (!recognition) return false;
+    if (pttStopTimer) {
+        clearTimeout(pttStopTimer);
+        pttStopTimer = null;
+    }
+    isPttSession = true;
     shouldBeListening = true;
 
-    const beginRecognition = () => {
-        try {
-            recognition.continuous = false;
-            recognition.start();
-            return true;
-        } catch (e) {
-            // Already started or starting
-            if (e.name !== 'InvalidStateError') {
-                console.warn('PTT start error:', e);
-            }
-            return false;
-        }
-    };
-
     if (isCurrentlyListening) {
-        try {
-            recognition.onend = () => {
-                isCurrentlyListening = false;
-                beginRecognition();
-            };
-            recognition.stop();
+        setStatus('listening');
+        return true;
+    }
+
+    try {
+        recognition.continuous = false;
+        recognition.interimResults = true;
+        recognition.start();
+        return true;
+    } catch (e) {
+        if (e.name === 'InvalidStateError') {
+            // Already active or starting
             return true;
-        } catch (e) {
-            return beginRecognition();
         }
-    } else {
-        return beginRecognition();
+        console.warn('PTT start failed:', e);
+        return false;
     }
 }
 
 /**
- * Stops Push-To-Talk recording.
+ * Stops Push-To-Talk recording with trailing grace buffer.
+ * @param {boolean} [immediate=false]
  */
-export function stopPushToTalk() {
+export function stopPushToTalk(immediate = false) {
     if (!recognition) return;
-    shouldBeListening = false;
-    try {
-        recognition.stop();
-    } catch (e) {}
-    setStatus('idle');
+    if (pttStopTimer) {
+        clearTimeout(pttStopTimer);
+        pttStopTimer = null;
+    }
+
+    const finalize = () => {
+        shouldBeListening = false;
+        isPttSession = false;
+        if (isCurrentlyListening) {
+            try {
+                recognition.stop();
+            } catch (e) {}
+        } else {
+            setStatus('idle');
+        }
+    };
+
+    if (immediate) {
+        finalize();
+    } else {
+        // 300ms buffer so user's final syllable is captured cleanly
+        pttStopTimer = setTimeout(finalize, 300);
+    }
 }
 
 /**
