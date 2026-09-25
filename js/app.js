@@ -11,6 +11,12 @@ import { parseFen, STARTING_FEN, EMPTY_FEN } from './fen-utils.js';
 import { formatMoveForSpeech, parseSpokenMove } from './move-parser.js';
 import { Chess } from '../lib/chess.esm.js'; 
 
+import { 
+  initSound, setSoundEnabled, isSoundEnabled, 
+  playMoveSound, playCaptureSound, playCheckSound, 
+  playCastleSound, playGameEndSound, triggerHaptic 
+} from './sound.js';
+
 const state = {
   mode: 'analysis',          // 'setup' | 'analysis'
   gameMode: 'analysis',      // 'analysis' | 'vs-computer' | 'local-1v1'
@@ -26,8 +32,11 @@ const state = {
   voiceSupported: false,
   freePlacement: false,   // Free placement mode in analysis
   selectedQuickPiece: null, // Selected piece from quick palette
+  historyMoves: [],       // Array of { san, from, to, piece, flags, fen, color, turn }
+  currentHistoryIndex: -1,// -1 is starting position, moves.length - 1 is latest move
   settings: {
     theme: 'dark',
+    soundEnabled: true,
     depth: (typeof window !== 'undefined' && (window.innerWidth <= 768 || /Android|iPhone|iPad/i.test(navigator.userAgent))) ? 15 : 18,
     analysisSide: 'white',   // 'white' | 'black' | 'auto'
     multiPV: 3,
@@ -145,6 +154,8 @@ function initDOM() {
   els.analyzeBtn = document.getElementById('analyze-btn');
   els.stopBtn = document.getElementById('stop-btn');
   els.flipBtn = document.getElementById('flip-board-btn');
+  els.soundToggleBtn = document.getElementById('sound-toggle-btn');
+  els.soundToggle = document.getElementById('sound-toggle');
   els.ttsToggleBtn = document.getElementById('tts-toggle-btn');
   els.clearBoardBtn = document.getElementById('clear-board-btn');
   els.startingPosBtn = document.getElementById('start-pos-btn');
@@ -158,6 +169,32 @@ function initDOM() {
   els.multiPvInput = document.getElementById('multipv-count');
   els.ttsSpeedInput = document.getElementById('tts-speed');
   els.ttsSpeedValue = document.getElementById('tts-speed-value');
+
+  // Player Info Strips & Captured Pieces
+  els.topPlayerStrip = document.getElementById('top-player-strip');
+  els.topPlayerName = document.getElementById('top-player-name');
+  els.topPlayerBadge = document.getElementById('top-player-badge');
+  els.topPlayerIcon = document.getElementById('top-player-icon');
+  els.topCapturedPieces = document.getElementById('top-captured-pieces');
+  els.topMaterialDiff = document.getElementById('top-material-diff');
+  els.bottomPlayerStrip = document.getElementById('bottom-player-strip');
+  els.bottomPlayerName = document.getElementById('bottom-player-name');
+  els.bottomPlayerBadge = document.getElementById('bottom-player-badge');
+  els.bottomPlayerIcon = document.getElementById('bottom-player-icon');
+  els.bottomCapturedPieces = document.getElementById('bottom-captured-pieces');
+  els.bottomMaterialDiff = document.getElementById('bottom-material-diff');
+
+  // Move History & Navigation
+  els.moveHistoryPanel = document.getElementById('move-history-panel');
+  els.historyMovesList = document.getElementById('history-moves-list');
+  els.historyMoveCount = document.getElementById('history-move-count');
+  els.copyPgnBtn = document.getElementById('copy-pgn-btn');
+  els.copyFenBtn = document.getElementById('copy-fen-btn');
+  els.navFirstBtn = document.getElementById('nav-first-btn');
+  els.navPrevBtn = document.getElementById('nav-prev-btn');
+  els.navNextBtn = document.getElementById('nav-next-btn');
+  els.navLastBtn = document.getElementById('nav-last-btn');
+  els.navLiveBadge = document.getElementById('nav-live-badge');
   
   // Game Mode & Play Controls
   els.modeSelectorBtns = document.querySelectorAll('.mode-btn');
@@ -260,6 +297,10 @@ function handleClearBoard() {
   if (els.candidateMoves) {
     els.candidateMoves.innerHTML = '<li class="candidate-item" style="color: var(--text-muted); justify-content: center;">Board cleared. Place pieces to analyze.</li>';
   }
+  state.historyMoves = [];
+  state.currentHistoryIndex = -1;
+  renderMoveHistoryUI();
+  updatePlayerStripsUI();
   showToast('Board cleared', 'info', 1500);
 }
 
@@ -281,6 +322,10 @@ function handleResetStartingPosition() {
     }
   });
   if (els.fenInput) els.fenInput.value = state.currentFen;
+  state.historyMoves = [];
+  state.currentHistoryIndex = -1;
+  renderMoveHistoryUI();
+  updatePlayerStripsUI();
   showToast('Starting position reset', 'info', 1500);
   triggerDebouncedAnalysis(100);
 }
@@ -347,6 +392,11 @@ function handleBoardMove(orig, dest) {
       });
       if (els.fenInput) els.fenInput.value = state.currentFen;
       
+      // Play sound, record history, update captured material
+      playMoveSoundFx(move);
+      recordMoveInHistory(move);
+      updatePlayerStripsUI();
+
       if (isTTSEnabled()) {
         speak(formatMoveForSpeech(move.san, move.piece, move.from, move.to, move.flags));
       }
@@ -457,6 +507,12 @@ function handleMoveExecution(parsed) {
         });
         if (els.fenInput) els.fenInput.value = state.currentFen;
         showToast(`Move made: ${move.san}`, 'success', 1500);
+
+        // Play sound, record history, update captured material
+        playMoveSoundFx(move);
+        recordMoveInHistory(move);
+        updatePlayerStripsUI();
+
         if (isTTSEnabled()) {
           speak(formatMoveForSpeech(move.san, move.piece, move.from, move.to, move.flags));
         }
@@ -530,6 +586,7 @@ function handleMoveExecution(parsed) {
       const move = state.chess.move(parsed.san || { to: parsed.to });
       if (move) {
         state.currentFen = state.chess.fen();
+        state.analysisPaused = false;
         const activeColor = state.chess.turn() === 'w' ? 'white' : 'black';
         state.ground.set({
           fen: state.currentFen,
@@ -537,17 +594,37 @@ function handleMoveExecution(parsed) {
           turnColor: activeColor,
           movable: state.freePlacement ? { free: true, color: 'both', dests: new Map() } : {
             free: false,
-            color: activeColor,
-            dests: getLegalMoves(),
+            color: (state.gameMode === 'vs-computer') ? (state.isGameOver ? undefined : state.playerColor) : activeColor,
+            dests: state.isGameOver ? new Map() : getLegalMoves(),
             showDests: true
           }
         });
         if (els.fenInput) els.fenInput.value = state.currentFen;
         showToast(`Move made: ${move.san}`, 'success', 1500);
+
+        // Play sound, record history, update captured material
+        playMoveSoundFx(move);
+        recordMoveInHistory(move);
+        updatePlayerStripsUI();
+
         if (isTTSEnabled()) {
           speak(formatMoveForSpeech(move.san, move.piece, move.from, move.to, move.flags));
         }
-        if (state.engineReady) {
+
+        if (state.gameMode === 'vs-computer') {
+          updateGameStatus();
+          if (!state.isGameOver) {
+            makeComputerMove();
+          }
+          return;
+        }
+
+        if (state.gameMode === 'local-1v1') {
+          updateGameStatus();
+          return;
+        }
+
+        if (state.engineReady && !state.analysisPaused) {
           startAnalysis(state.currentFen, {
             depth: state.settings.depth,
             multiPV: state.settings.multiPV,
@@ -729,6 +806,11 @@ function onBestMove(result) {
           });
           updateGameStatus();
 
+          // Play sound, record history, update captured material
+          playMoveSoundFx(chessMove);
+          recordMoveInHistory(chessMove);
+          updatePlayerStripsUI();
+
           if (isTTSEnabled()) {
             speak(`Computer plays ${result.bestMove}`);
           }
@@ -750,6 +832,335 @@ function onBestMove(result) {
   
   if (els.analyzeBtn) els.analyzeBtn.disabled = false;
   if (els.stopBtn) els.stopBtn.style.display = 'none';
+}
+
+// Sound & Haptic FX Helper
+function playMoveSoundFx(move) {
+  if (!state.chess) return;
+  if (state.chess.isCheckmate() || state.chess.isDraw()) {
+    playGameEndSound();
+  } else if (state.chess.isCheck()) {
+    playCheckSound();
+  } else if (move && move.captured) {
+    playCaptureSound();
+  } else if (move && move.flags && (move.flags.includes('k') || move.flags.includes('q'))) {
+    playCastleSound();
+  } else {
+    playMoveSound();
+  }
+}
+
+function updateSoundUI() {
+  const enabled = !!state.settings.soundEnabled;
+  if (els.soundToggleBtn) {
+    els.soundToggleBtn.textContent = enabled ? '🔊' : '🔇';
+    els.soundToggleBtn.title = enabled ? 'Mute Sound Effects' : 'Enable Sound Effects';
+    els.soundToggleBtn.setAttribute('aria-label', enabled ? 'Mute Sound Effects' : 'Enable Sound Effects');
+  }
+  if (els.soundToggle) {
+    els.soundToggle.value = enabled ? 'enabled' : 'disabled';
+  }
+}
+
+function toggleSound() {
+  const newEnabled = !state.settings.soundEnabled;
+  state.settings.soundEnabled = newEnabled;
+  setSoundEnabled(newEnabled);
+  saveSettings();
+  updateSoundUI();
+  showToast(newEnabled ? 'Sound Effects Enabled 🔊' : 'Sound Effects Muted 🔇', 'info', 2000);
+}
+
+// Material & Captured Pieces
+function getPieceSymbol(type, color) {
+  const symbols = {
+    w: { k: '♔', q: '♕', r: '♖', b: '♗', n: '♘', p: '♙' },
+    b: { k: '♚', q: '♛', r: '♜', b: '♝', n: '♞', p: '♟' }
+  };
+  return (symbols[color] && symbols[color][type]) || '';
+}
+
+function calculateMaterial() {
+  if (!state.chess) return { capturedByWhite: [], capturedByBlack: [], whiteDiff: 0, blackDiff: 0 };
+  const initialCounts = { p: 8, n: 2, b: 2, r: 2, q: 1 };
+  const currentCounts = {
+    w: { p: 0, n: 0, b: 0, r: 0, q: 0 },
+    b: { p: 0, n: 0, b: 0, r: 0, q: 0 }
+  };
+
+  const board = state.chess.board();
+  for (const row of board) {
+    for (const sq of row) {
+      if (sq && sq.type !== 'k') {
+        currentCounts[sq.color][sq.type] = (currentCounts[sq.color][sq.type] || 0) + 1;
+      }
+    }
+  }
+
+  const pieceValues = { p: 1, n: 3, b: 3, r: 5, q: 9 };
+  const capturedByWhite = [];
+  const capturedByBlack = [];
+  let whiteMaterial = 0;
+  let blackMaterial = 0;
+
+  for (const type of ['q', 'r', 'b', 'n', 'p']) {
+    const blackLost = Math.max(0, initialCounts[type] - (currentCounts.b[type] || 0));
+    for (let i = 0; i < blackLost; i++) {
+      capturedByWhite.push({ color: 'b', type });
+      whiteMaterial += pieceValues[type];
+    }
+    const whiteLost = Math.max(0, initialCounts[type] - (currentCounts.w[type] || 0));
+    for (let i = 0; i < whiteLost; i++) {
+      capturedByBlack.push({ color: 'w', type });
+      blackMaterial += pieceValues[type];
+    }
+  }
+
+  const diff = whiteMaterial - blackMaterial;
+  return {
+    capturedByWhite,
+    capturedByBlack,
+    whiteDiff: diff > 0 ? diff : 0,
+    blackDiff: diff < 0 ? Math.abs(diff) : 0
+  };
+}
+
+function updatePlayerStripsUI() {
+  const mat = calculateMaterial();
+  const isFlipped = state.boardOrientation === 'black';
+
+  const bottomColor = isFlipped ? 'black' : 'white';
+  const topColor = isFlipped ? 'white' : 'black';
+
+  if (els.topPlayerName) {
+    if (state.gameMode === 'vs-computer') {
+      const isComputerTop = (state.playerColor === 'white' && !isFlipped) || (state.playerColor === 'black' && isFlipped);
+      els.topPlayerName.textContent = isComputerTop ? `Stockfish (Lvl ${state.difficulty})` : 'You';
+      if (els.topPlayerIcon) els.topPlayerIcon.textContent = isComputerTop ? '🤖' : '👤';
+      if (els.topPlayerBadge) els.topPlayerBadge.textContent = topColor === 'white' ? 'White' : 'Black';
+    } else if (state.gameMode === 'local-1v1') {
+      els.topPlayerName.textContent = topColor === 'white' ? 'White' : 'Black';
+      if (els.topPlayerIcon) els.topPlayerIcon.textContent = topColor === 'white' ? '♔' : '♚';
+      if (els.topPlayerBadge) els.topPlayerBadge.textContent = 'Player 2';
+    } else {
+      els.topPlayerName.textContent = topColor === 'white' ? 'White' : 'Black';
+      if (els.topPlayerIcon) els.topPlayerIcon.textContent = topColor === 'white' ? '♔' : '♚';
+      if (els.topPlayerBadge) els.topPlayerBadge.textContent = 'Analysis';
+    }
+  }
+
+  if (els.bottomPlayerName) {
+    if (state.gameMode === 'vs-computer') {
+      const isComputerBottom = (state.playerColor === 'black' && !isFlipped) || (state.playerColor === 'white' && isFlipped);
+      els.bottomPlayerName.textContent = isComputerBottom ? `Stockfish (Lvl ${state.difficulty})` : 'You';
+      if (els.bottomPlayerIcon) els.bottomPlayerIcon.textContent = isComputerBottom ? '🤖' : '👤';
+      if (els.bottomPlayerBadge) els.bottomPlayerBadge.textContent = bottomColor === 'white' ? 'White' : 'Black';
+    } else if (state.gameMode === 'local-1v1') {
+      els.bottomPlayerName.textContent = bottomColor === 'white' ? 'White' : 'Black';
+      if (els.bottomPlayerIcon) els.bottomPlayerIcon.textContent = bottomColor === 'white' ? '♔' : '♚';
+      if (els.bottomPlayerBadge) els.bottomPlayerBadge.textContent = 'Player 1';
+    } else {
+      els.bottomPlayerName.textContent = bottomColor === 'white' ? 'White' : 'Black';
+      if (els.bottomPlayerIcon) els.bottomPlayerIcon.textContent = bottomColor === 'white' ? '♔' : '♚';
+      if (els.bottomPlayerBadge) els.bottomPlayerBadge.textContent = 'Analysis';
+    }
+  }
+
+  const topCaptured = topColor === 'white' ? mat.capturedByWhite : mat.capturedByBlack;
+  const topDiff = topColor === 'white' ? mat.whiteDiff : mat.blackDiff;
+  const bottomCaptured = bottomColor === 'white' ? mat.capturedByWhite : mat.capturedByBlack;
+  const bottomDiff = bottomColor === 'white' ? mat.whiteDiff : mat.blackDiff;
+
+  if (els.topCapturedPieces) {
+    els.topCapturedPieces.innerHTML = topCaptured.map(p => 
+      `<span class="captured-piece piece-${p.color === 'w' ? 'white' : 'black'}">${getPieceSymbol(p.type, p.color)}</span>`
+    ).join('');
+  }
+  if (els.topMaterialDiff) {
+    if (topDiff > 0) {
+      els.topMaterialDiff.textContent = `+${topDiff}`;
+      els.topMaterialDiff.classList.remove('hidden');
+    } else {
+      els.topMaterialDiff.classList.add('hidden');
+    }
+  }
+
+  if (els.bottomCapturedPieces) {
+    els.bottomCapturedPieces.innerHTML = bottomCaptured.map(p => 
+      `<span class="captured-piece piece-${p.color === 'w' ? 'white' : 'black'}">${getPieceSymbol(p.type, p.color)}</span>`
+    ).join('');
+  }
+  if (els.bottomMaterialDiff) {
+    if (bottomDiff > 0) {
+      els.bottomMaterialDiff.textContent = `+${bottomDiff}`;
+      els.bottomMaterialDiff.classList.remove('hidden');
+    } else {
+      els.bottomMaterialDiff.classList.add('hidden');
+    }
+  }
+}
+
+// Move History & Step Navigation
+function recordMoveInHistory(move) {
+  if (!move || !state.chess) return;
+  if (state.currentHistoryIndex < state.historyMoves.length - 1) {
+    state.historyMoves = state.historyMoves.slice(0, state.currentHistoryIndex + 1);
+  }
+
+  state.historyMoves.push({
+    san: move.san,
+    from: move.from,
+    to: move.to,
+    piece: move.piece,
+    flags: move.flags,
+    fen: state.chess.fen(),
+    color: move.color,
+    turn: state.chess.turn()
+  });
+
+  state.currentHistoryIndex = state.historyMoves.length - 1;
+  renderMoveHistoryUI();
+}
+
+function renderMoveHistoryUI() {
+  if (!els.historyMovesList) return;
+
+  const moves = state.historyMoves;
+  if (els.historyMoveCount) {
+    els.historyMoveCount.textContent = `${moves.length} move${moves.length === 1 ? '' : 's'}`;
+  }
+
+  if (moves.length === 0) {
+    els.historyMovesList.innerHTML = '<div class="history-empty-placeholder">No moves played yet</div>';
+    if (els.navFirstBtn) els.navFirstBtn.disabled = true;
+    if (els.navPrevBtn) els.navPrevBtn.disabled = true;
+    if (els.navNextBtn) els.navNextBtn.disabled = true;
+    if (els.navLastBtn) els.navLastBtn.disabled = true;
+    if (els.navLiveBadge) els.navLiveBadge.classList.add('hidden');
+    return;
+  }
+
+  let html = '';
+  for (let i = 0; i < moves.length; i += 2) {
+    const moveNum = Math.floor(i / 2) + 1;
+    const whiteMove = moves[i];
+    const blackMove = moves[i + 1];
+
+    const isWhiteActive = state.currentHistoryIndex === i;
+    const isBlackActive = blackMove && state.currentHistoryIndex === (i + 1);
+
+    html += `<div class="history-row">
+      <span class="history-num">${moveNum}.</span>
+      <button class="history-move-cell ${isWhiteActive ? 'active-step' : ''}" data-move-idx="${i}" aria-label="Move ${moveNum} White ${whiteMove.san}">${whiteMove.san}</button>
+      ${blackMove ? `<button class="history-move-cell ${isBlackActive ? 'active-step' : ''}" data-move-idx="${i + 1}" aria-label="Move ${moveNum} Black ${blackMove.san}">${blackMove.san}</button>` : '<span class="history-move-cell" style="cursor: default; opacity: 0.3;">...</span>'}
+    </div>`;
+  }
+
+  els.historyMovesList.innerHTML = html;
+
+  const activeEl = els.historyMovesList.querySelector('.active-step');
+  if (activeEl && els.historyMovesList) {
+    els.historyMovesList.scrollTop = activeEl.offsetTop - els.historyMovesList.offsetTop;
+  }
+
+  const isAtStart = state.currentHistoryIndex === -1;
+  const isAtLatest = state.currentHistoryIndex === moves.length - 1;
+
+  if (els.navFirstBtn) els.navFirstBtn.disabled = isAtStart;
+  if (els.navPrevBtn) els.navPrevBtn.disabled = isAtStart;
+  if (els.navNextBtn) els.navNextBtn.disabled = isAtLatest;
+  if (els.navLastBtn) els.navLastBtn.disabled = isAtLatest;
+
+  if (els.navLiveBadge) {
+    if (!isAtLatest) {
+      els.navLiveBadge.classList.remove('hidden');
+    } else {
+      els.navLiveBadge.classList.add('hidden');
+    }
+  }
+}
+
+function goToHistoryIndex(idx) {
+  const moves = state.historyMoves;
+  if (moves.length === 0) return;
+
+  const targetIdx = Math.max(-1, Math.min(moves.length - 1, idx));
+  state.currentHistoryIndex = targetIdx;
+
+  const isAtLatest = targetIdx === moves.length - 1;
+
+  if (targetIdx === -1) {
+    state.ground.set({
+      fen: STARTING_FEN,
+      lastMove: null,
+      movable: {
+        free: false,
+        color: undefined,
+        dests: new Map()
+      }
+    });
+    if (state.gameMode === 'analysis') {
+      triggerDebouncedAnalysis(200);
+    }
+  } else {
+    const move = moves[targetIdx];
+    const activeColor = move.turn === 'w' ? 'white' : 'black';
+
+    state.ground.set({
+      fen: move.fen,
+      lastMove: [move.from, move.to],
+      turnColor: activeColor,
+      movable: {
+        free: false,
+        color: isAtLatest ? ((state.gameMode === 'vs-computer') ? (state.isGameOver ? undefined : state.playerColor) : activeColor) : undefined,
+        dests: isAtLatest ? (state.isGameOver ? new Map() : getLegalMoves()) : new Map()
+      }
+    });
+
+    if (state.gameMode === 'analysis') {
+      triggerDebouncedAnalysis(200);
+    }
+  }
+
+  renderMoveHistoryUI();
+}
+
+function copyPgnToClipboard() {
+  try {
+    const pgn = state.chess ? state.chess.pgn() : '';
+    if (!pgn || pgn.trim() === '') {
+      showToast('No moves to copy yet', 'info', 2000);
+      return;
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(pgn).then(() => {
+        showToast('PGN copied to clipboard! 📋', 'success', 2500);
+      }).catch(() => {
+        showToast('Copied PGN!', 'success', 2000);
+      });
+    } else {
+      showToast('Clipboard not supported', 'info', 2000);
+    }
+  } catch (e) {
+    showToast('Failed to copy PGN', 'error', 2000);
+  }
+}
+
+function copyFenToClipboard() {
+  try {
+    const fen = state.chess ? state.chess.fen() : state.currentFen;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(fen).then(() => {
+        showToast('FEN copied to clipboard! 📋', 'success', 2500);
+      }).catch(() => {
+        showToast('Copied FEN!', 'success', 2000);
+      });
+    } else {
+      showToast('Clipboard not supported', 'info', 2000);
+    }
+  } catch (e) {
+    showToast('Failed to copy FEN', 'error', 2000);
+  }
 }
 
 const DIFFICULTY_DEPTHS = { 1: 3, 2: 6, 3: 10, 4: 15, 5: 20, 6: 25 };
@@ -782,11 +1193,17 @@ function switchGameMode(mode) {
     els.gameStatusBar.classList.toggle('hidden', mode === 'analysis');
   }
 
-  // Show/hide editing controls (palette, free move, clear board) — only in analysis
+  // Show/hide editing controls (palette, free move, clear board, candidate lines, voice bar)
   const editControls = document.querySelector('.quick-actions-bar');
   const paletteControls = document.querySelector('.piece-palette-deck');
+  const candidatePanel = document.querySelector('.candidate-moves-panel');
+  const voiceBar = document.querySelector('.voice-type-bar');
   if (editControls) editControls.style.display = mode === 'analysis' ? '' : 'none';
   if (paletteControls) paletteControls.style.display = mode === 'analysis' ? '' : 'none';
+  if (candidatePanel) candidatePanel.style.display = mode === 'analysis' ? '' : 'none';
+  if (voiceBar) voiceBar.style.display = mode === 'analysis' ? '' : 'none';
+
+  updatePlayerStripsUI();
 
   if (mode === 'analysis') {
     // Restore analysis mode
@@ -818,7 +1235,11 @@ function startNewGame(mode) {
   state.chess = new Chess();
   state.currentFen = STARTING_FEN;
   state.isGameOver = false;
+  state.historyMoves = [];
+  state.currentHistoryIndex = -1;
   state.ground.setAutoShapes([]);
+  renderMoveHistoryUI();
+  updatePlayerStripsUI();
 
   if (mode === 'vs-computer') {
     let color = els.playAsColor ? els.playAsColor.value : 'white';
@@ -1088,8 +1509,72 @@ function bindEvents() {
     els.flipBtn.addEventListener('click', () => {
       state.boardOrientation = state.boardOrientation === 'white' ? 'black' : 'white';
       state.ground.set({ orientation: state.boardOrientation });
+      updatePlayerStripsUI();
     });
   }
+
+  // Sound Effects Toggle
+  if (els.soundToggleBtn) {
+    els.soundToggleBtn.addEventListener('click', toggleSound);
+  }
+  if (els.soundToggle) {
+    els.soundToggle.addEventListener('change', (e) => {
+      const enabled = e.target.value === 'enabled';
+      state.settings.soundEnabled = enabled;
+      setSoundEnabled(enabled);
+      saveSettings();
+      updateSoundUI();
+    });
+  }
+
+  // Move History Navigation & Actions
+  if (els.navFirstBtn) {
+    els.navFirstBtn.addEventListener('click', () => goToHistoryIndex(-1));
+  }
+  if (els.navPrevBtn) {
+    els.navPrevBtn.addEventListener('click', () => goToHistoryIndex(state.currentHistoryIndex - 1));
+  }
+  if (els.navNextBtn) {
+    els.navNextBtn.addEventListener('click', () => goToHistoryIndex(state.currentHistoryIndex + 1));
+  }
+  if (els.navLastBtn) {
+    els.navLastBtn.addEventListener('click', () => goToHistoryIndex(state.historyMoves.length - 1));
+  }
+  if (els.navLiveBadge) {
+    els.navLiveBadge.addEventListener('click', () => goToHistoryIndex(state.historyMoves.length - 1));
+  }
+  if (els.historyMovesList) {
+    els.historyMovesList.addEventListener('click', (e) => {
+      const cell = e.target.closest('.history-move-cell');
+      if (cell && cell.dataset.moveIdx !== undefined) {
+        goToHistoryIndex(parseInt(cell.dataset.moveIdx, 10));
+      }
+    });
+  }
+  if (els.copyPgnBtn) {
+    els.copyPgnBtn.addEventListener('click', copyPgnToClipboard);
+  }
+  if (els.copyFenBtn) {
+    els.copyFenBtn.addEventListener('click', copyFenToClipboard);
+  }
+
+  // Keyboard navigation for Move History (ArrowLeft, ArrowRight, Home, End)
+  window.addEventListener('keydown', (e) => {
+    if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT')) return;
+    if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      goToHistoryIndex(state.currentHistoryIndex - 1);
+    } else if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      goToHistoryIndex(state.currentHistoryIndex + 1);
+    } else if (e.key === 'Home') {
+      e.preventDefault();
+      goToHistoryIndex(-1);
+    } else if (e.key === 'End') {
+      e.preventDefault();
+      goToHistoryIndex(state.historyMoves.length - 1);
+    }
+  });
   
   // Depth Slider
   if (els.depthSlider) {
@@ -1460,6 +1945,12 @@ async function init() {
     setTimeout(() => state.ground?.redrawAll(), 60);
     window.appState = state;
     
+    // Initialize Sound, Player Strips, and Move History
+    initSound(state.settings.soundEnabled !== false);
+    updateSoundUI();
+    updatePlayerStripsUI();
+    renderMoveHistoryUI();
+
     // 3. Initialize Stockfish Engine
     if (els.engineStatusText) els.engineStatusText.textContent = 'Loading...';
     initEngine({

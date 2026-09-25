@@ -10,18 +10,18 @@
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>♞</text></svg>">
 
     <!-- Chessground CSS (Local & Offline) -->
-    <link rel="stylesheet" href="css/chessground.base.css?v=15">
-    <link rel="stylesheet" href="css/chessground.brown.css?v=15">
-    <link rel="stylesheet" href="css/chessground.cburnett.css?v=15">
+    <link rel="stylesheet" href="css/chessground.base.css?v=16">
+    <link rel="stylesheet" href="css/chessground.brown.css?v=16">
+    <link rel="stylesheet" href="css/chessground.cburnett.css?v=16">
     
     <!-- Modern App CSS -->
-    <link rel="stylesheet" href="css/app.css?v=15">
+    <link rel="stylesheet" href="css/app.css?v=16">
     
     <!-- Service Worker Registration -->
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('./sw.js?v=15')
+          navigator.serviceWorker.register('./sw.js?v=16')
             .then(reg => console.log('SW registered:', reg.scope))
             .catch(err => console.warn('SW registration failed:', err));
         });
@@ -48,7 +48,8 @@
             </div>
 
             <div class="header-actions">
-                <button id="tts-toggle-btn" class="icon-btn" title="Toggle Speech (TTS)" aria-label="Toggle speech" data-action="toggle-tts">🔊</button>
+                <button id="sound-toggle-btn" class="icon-btn" title="Toggle Sound Effects" aria-label="Toggle Sound Effects">🔊</button>
+                <button id="tts-toggle-btn" class="icon-btn" title="Toggle Speech (TTS)" aria-label="Toggle speech" data-action="toggle-tts">🗣️</button>
                 <button id="flip-board-btn" class="icon-btn" title="Flip Board" aria-label="Flip board" data-action="flip-board">🔄</button>
                 <button id="help-btn" class="icon-btn" title="User Guide" aria-label="Open User Guide" data-action="open-help">❓</button>
                 <button id="settings-btn" class="icon-btn" title="Settings" aria-label="Open Settings" data-action="open-settings">⚙️</button>
@@ -59,6 +60,21 @@
         <main class="app-content single-screen-layout">
             <!-- 1. The Chessboard & HUD -->
             <section class="board-container-card">
+                <!-- Top Player Info Strip (Opponent / Black) -->
+                <div id="top-player-strip" class="player-strip top-player" aria-label="Opponent Player Info">
+                    <div class="player-meta">
+                        <span id="top-player-icon" class="player-avatar">🤖</span>
+                        <div class="player-identity">
+                            <span id="top-player-name" class="player-name">Stockfish</span>
+                            <span id="top-player-badge" class="player-badge">Engine</span>
+                        </div>
+                    </div>
+                    <div class="player-material">
+                        <div id="top-captured-pieces" class="captured-tray" aria-label="Captured pieces"></div>
+                        <span id="top-material-diff" class="material-diff-badge hidden">+0</span>
+                    </div>
+                </div>
+
                 <div class="board-wrapper">
                     <!-- Integrated Left Edge Eval Gauge -->
                     <div id="eval-bar" class="eval-gauge" aria-hidden="true">
@@ -67,6 +83,21 @@
                     <!-- Perfect Square Chessground Mount Container -->
                     <div class="board-square-container">
                         <div id="board" class="cg-board-wrap"></div>
+                    </div>
+                </div>
+
+                <!-- Bottom Player Info Strip (You / White) -->
+                <div id="bottom-player-strip" class="player-strip bottom-player" aria-label="Player Info">
+                    <div class="player-meta">
+                        <span id="bottom-player-icon" class="player-avatar">👤</span>
+                        <div class="player-identity">
+                            <span id="bottom-player-name" class="player-name">You</span>
+                            <span id="bottom-player-badge" class="player-badge">White</span>
+                        </div>
+                    </div>
+                    <div class="player-material">
+                        <div id="bottom-captured-pieces" class="captured-tray" aria-label="Captured pieces"></div>
+                        <span id="bottom-material-diff" class="material-diff-badge hidden">+0</span>
                     </div>
                 </div>
 
@@ -146,6 +177,7 @@
                         ▶ New 1v1 Game
                     </button>
                 </div>
+
                 <!-- 1-Click Action Buttons -->
                 <div class="quick-actions-bar">
                     <button id="clear-board-btn" class="action-btn btn-danger" data-action="clear-board" title="Wipe all pieces from the board">
@@ -205,6 +237,33 @@
                             Evaluating position...
                         </li>
                     </ul>
+                </div>
+
+                <!-- Move History & Step Navigation Panel -->
+                <div class="move-history-panel" id="move-history-panel">
+                    <div class="history-header">
+                        <div class="history-title-wrap">
+                            <span class="history-title-icon">📜</span>
+                            <span class="history-title-text">Move History</span>
+                            <span id="history-move-count" class="history-count-badge">0 moves</span>
+                        </div>
+                        <div class="history-header-actions">
+                            <button id="copy-pgn-btn" class="action-btn-xs" title="Copy game PGN">📋 PGN</button>
+                            <button id="copy-fen-btn" class="action-btn-xs" title="Copy current FEN">📋 FEN</button>
+                        </div>
+                    </div>
+                    
+                    <div id="history-moves-list" class="history-moves-list" tabindex="0" role="region" aria-label="Move history list">
+                        <div class="history-empty-placeholder">No moves played yet</div>
+                    </div>
+
+                    <div class="history-nav-bar">
+                        <button id="nav-first-btn" class="nav-step-btn" title="Start position (Home)" aria-label="Start position">⏮</button>
+                        <button id="nav-prev-btn" class="nav-step-btn" title="Previous move (Left arrow)" aria-label="Previous move">◀</button>
+                        <button id="nav-next-btn" class="nav-step-btn" title="Next move (Right arrow)" aria-label="Next move">▶</button>
+                        <button id="nav-last-btn" class="nav-step-btn" title="Latest move (End)" aria-label="Latest move">⏭</button>
+                        <button id="nav-live-badge" class="nav-live-btn hidden" title="Viewing past move. Tap to return to live position">🔴 Return to Live</button>
+                    </div>
                 </div>
             </section>
         </main>
@@ -282,6 +341,13 @@
                         <select id="theme-toggle" data-setting="theme">
                             <option value="dark">Dark (Default)</option>
                             <option value="light">Light</option>
+                        </select>
+                    </div>
+                    <div class="setting-row">
+                        <label for="sound-toggle">Move Sound Effects</label>
+                        <select id="sound-toggle" data-setting="sound">
+                            <option value="enabled" selected>Enabled (Tactile Wood & Chimes)</option>
+                            <option value="disabled">Muted</option>
                         </select>
                     </div>
                     <div class="setting-row">

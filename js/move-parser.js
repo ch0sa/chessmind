@@ -30,6 +30,7 @@ const CORRECTIONS = [
     [/\bupon\b/g, 'pawn'],
 
     // Actions
+    [/([a-hkqrbn])x([a-h][1-8])/gi, '$1 takes $2'],
     [/\btax\b/g, 'takes'],
     [/\btext\b/g, 'takes'],
     [/\bcapture\b/g, 'takes'],
