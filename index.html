@@ -10,18 +10,18 @@
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>♞</text></svg>">
 
     <!-- Chessground CSS (Local & Offline) -->
-    <link rel="stylesheet" href="css/chessground.base.css?v=14">
-    <link rel="stylesheet" href="css/chessground.brown.css?v=14">
-    <link rel="stylesheet" href="css/chessground.cburnett.css?v=14">
+    <link rel="stylesheet" href="css/chessground.base.css?v=15">
+    <link rel="stylesheet" href="css/chessground.brown.css?v=15">
+    <link rel="stylesheet" href="css/chessground.cburnett.css?v=15">
     
     <!-- Modern App CSS -->
-    <link rel="stylesheet" href="css/app.css?v=14">
+    <link rel="stylesheet" href="css/app.css?v=15">
     
     <!-- Service Worker Registration -->
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('./sw.js?v=14')
+          navigator.serviceWorker.register('./sw.js?v=15')
             .then(reg => console.log('SW registered:', reg.scope))
             .catch(err => console.warn('SW registration failed:', err));
         });
@@ -85,10 +85,67 @@
                         <button id="stop-btn" class="hud-pill-btn" data-action="stop-analysis" style="display: none; color: var(--accent-red);">⏹ Stop</button>
                     </div>
                 </div>
+
+                <!-- Game Status Bar (for vs-computer and 1v1 modes) -->
+                <div id="game-status-bar" class="game-status-bar hidden">
+                    <span id="game-status-text">Your turn (White)</span>
+                    <div style="display: flex; gap: 6px;">
+                        <button id="resign-btn" class="action-btn btn-danger btn-sm" style="display: none;">🏳️ Resign</button>
+                        <button id="new-game-again-btn" class="action-btn btn-sm" style="display: none;">🔄 New Game</button>
+                    </div>
+                </div>
             </section>
 
             <!-- 2. Controls & Actions Section -->
             <section class="unified-controls-card">
+                <!-- Game Mode Selector -->
+                <div class="mode-selector-bar" role="tablist" aria-label="Game Mode">
+                    <button class="mode-btn active" data-mode="analysis" role="tab" aria-selected="true">
+                        🔍 Analysis
+                    </button>
+                    <button class="mode-btn" data-mode="vs-computer" role="tab" aria-selected="false">
+                        🤖 vs Computer
+                    </button>
+                    <button class="mode-btn" data-mode="local-1v1" role="tab" aria-selected="false">
+                        👥 1v1 Local
+                    </button>
+                </div>
+                
+                <!-- VS Computer Settings (hidden by default) -->
+                <div id="vs-computer-panel" class="mode-panel hidden">
+                    <div class="setting-row compact">
+                        <label for="play-as-color">Play as</label>
+                        <select id="play-as-color">
+                            <option value="white">White</option>
+                            <option value="black">Black</option>
+                            <option value="random">Random</option>
+                        </select>
+                    </div>
+                    <div class="setting-row compact">
+                        <label for="difficulty-level">Difficulty</label>
+                        <select id="difficulty-level">
+                            <option value="1">Beginner (Depth 3)</option>
+                            <option value="2">Easy (Depth 6)</option>
+                            <option value="3" selected>Medium (Depth 10)</option>
+                            <option value="4">Hard (Depth 15)</option>
+                            <option value="5">Expert (Depth 20)</option>
+                            <option value="6">Maximum (Depth 25)</option>
+                        </select>
+                    </div>
+                    <button id="new-game-btn" class="action-btn btn-primary" style="width: 100%; margin-top: 8px;">
+                        ▶ New Game
+                    </button>
+                </div>
+
+                <!-- 1v1 Local Settings (hidden by default) -->
+                <div id="local-1v1-panel" class="mode-panel hidden">
+                    <p style="color: var(--text-secondary); font-size: 0.85rem; margin: 4px 0 8px;">
+                        Two players alternate turns on the same device.
+                    </p>
+                    <button id="new-1v1-btn" class="action-btn btn-primary" style="width: 100%;">
+                        ▶ New 1v1 Game
+                    </button>
+                </div>
                 <!-- 1-Click Action Buttons -->
                 <div class="quick-actions-bar">
                     <button id="clear-board-btn" class="action-btn btn-danger" data-action="clear-board" title="Wipe all pieces from the board">
@@ -228,11 +285,23 @@
                         </select>
                     </div>
                     <div class="setting-row">
+                        <label for="depth-slider">Engine Depth: <span id="depth-value">15</span></label>
+                        <input type="range" id="depth-slider" min="1" max="25" value="15" data-setting="depth">
+                    </div>
+                    <div class="setting-row">
+                        <label for="analysis-side">Eval Perspective</label>
+                        <select id="analysis-side" data-setting="analysis-side">
+                            <option value="white">White</option>
+                            <option value="black">Black</option>
+                            <option value="auto">Auto (follow turn)</option>
+                        </select>
+                    </div>
+                    <div class="setting-row">
                         <label for="multipv-count">Candidate Lines (Multi-PV)</label>
                         <input type="number" id="multipv-count" min="1" max="5" value="3" data-setting="multipv">
                     </div>
                     <div class="setting-row">
-                        <label for="tts-speed">TTS Speech Speed</label>
+                        <label for="tts-speed">TTS Speed: <span id="tts-speed-value">1.0</span>x</label>
                         <input type="range" id="tts-speed" min="0.5" max="2.0" step="0.1" value="1.0" data-setting="tts-speed">
                     </div>
                 </div>

@@ -13,6 +13,11 @@ import { Chess } from '../lib/chess.esm.js';
 
 const state = {
   mode: 'analysis',          // 'setup' | 'analysis'
+  gameMode: 'analysis',      // 'analysis' | 'vs-computer' | 'local-1v1'
+  playerColor: 'white',      // 'white' | 'black' (human player in vs-computer)
+  difficulty: 3,             // 1-6 difficulty level
+  isGameOver: false,
+  analysisPaused: false,     // True when user explicitly stopped analysis
   ground: null,           // Chessground instance
   chess: null,            // chess.js instance
   currentFen: STARTING_FEN,
@@ -24,6 +29,7 @@ const state = {
   settings: {
     theme: 'dark',
     depth: (typeof window !== 'undefined' && (window.innerWidth <= 768 || /Android|iPhone|iPad/i.test(navigator.userAgent))) ? 15 : 18,
+    analysisSide: 'white',   // 'white' | 'black' | 'auto'
     multiPV: 3,
     threads: (typeof window !== 'undefined' && (window.innerWidth <= 768 || /Android|iPhone|iPad/i.test(navigator.userAgent))) ? 1 : Math.max(1, Math.min(2, Math.floor((navigator.hardwareConcurrency || 2) / 2))),
     ttsEnabled: false,
@@ -146,8 +152,25 @@ function initDOM() {
   els.closeSettingsBtn = document.getElementById('close-settings');
   els.settingsModal = document.getElementById('settings-modal');
   els.themeToggle = document.getElementById('theme-toggle');
+  els.depthSlider = document.getElementById('depth-slider');
+  els.depthValue = document.getElementById('depth-value');
+  els.analysisSideSelect = document.getElementById('analysis-side');
   els.multiPvInput = document.getElementById('multipv-count');
   els.ttsSpeedInput = document.getElementById('tts-speed');
+  els.ttsSpeedValue = document.getElementById('tts-speed-value');
+  
+  // Game Mode & Play Controls
+  els.modeSelectorBtns = document.querySelectorAll('.mode-btn');
+  els.vsComputerPanel = document.getElementById('vs-computer-panel');
+  els.local1v1Panel = document.getElementById('local-1v1-panel');
+  els.playAsColor = document.getElementById('play-as-color');
+  els.difficultyLevel = document.getElementById('difficulty-level');
+  els.newGameBtn = document.getElementById('new-game-btn');
+  els.new1v1Btn = document.getElementById('new-1v1-btn');
+  els.gameStatusBar = document.getElementById('game-status-bar');
+  els.gameStatusText = document.getElementById('game-status-text');
+  els.resignBtn = document.getElementById('resign-btn');
+  els.newGameAgainBtn = document.getElementById('new-game-again-btn');
   
   // Analysis panels
   els.evalBar = document.getElementById('eval-bar');
@@ -194,10 +217,12 @@ function roleToChar(role) {
 let analysisDebounceTimer = null;
 
 function triggerDebouncedAnalysis(delay = 250) {
+  if (state.analysisPaused || state.gameMode !== 'analysis') return;
   if (analysisDebounceTimer) {
     clearTimeout(analysisDebounceTimer);
   }
   analysisDebounceTimer = setTimeout(() => {
+    if (state.analysisPaused || state.gameMode !== 'analysis') return;
     if (!state.engineReady) return;
     const fen = state.currentFen;
     const validation = validateFen(fen);
@@ -305,6 +330,7 @@ function handleBoardMove(orig, dest) {
     
     if (move) {
       state.currentFen = state.chess.fen();
+      state.analysisPaused = false;
       const activeColor = state.chess.turn() === 'w' ? 'white' : 'black';
       
       // Update valid moves on board
@@ -314,8 +340,8 @@ function handleBoardMove(orig, dest) {
         turnColor: activeColor,
         movable: {
           free: false,
-          color: activeColor,
-          dests: getLegalMoves(),
+          color: (state.gameMode === 'vs-computer') ? (state.isGameOver ? undefined : state.playerColor) : activeColor,
+          dests: state.isGameOver ? new Map() : getLegalMoves(),
           showDests: true
         }
       });
@@ -323,6 +349,19 @@ function handleBoardMove(orig, dest) {
       
       if (isTTSEnabled()) {
         speak(formatMoveForSpeech(move.san, move.piece, move.from, move.to, move.flags));
+      }
+
+      if (state.gameMode === 'vs-computer') {
+        updateGameStatus();
+        if (!state.isGameOver) {
+          makeComputerMove();
+        }
+        return;
+      }
+
+      if (state.gameMode === 'local-1v1') {
+        updateGameStatus();
+        return;
       }
       
       triggerDebouncedAnalysis(200);
@@ -403,6 +442,7 @@ function handleMoveExecution(parsed) {
       const move = state.chess.move({ from: parsed.from, to: parsed.to, promotion: parsed.promotion || 'q' });
       if (move) {
         state.currentFen = state.chess.fen();
+        state.analysisPaused = false;
         const activeColor = state.chess.turn() === 'w' ? 'white' : 'black';
         state.ground.set({
           fen: state.currentFen,
@@ -410,8 +450,8 @@ function handleMoveExecution(parsed) {
           turnColor: activeColor,
           movable: state.freePlacement ? { free: true, color: 'both', dests: new Map() } : {
             free: false,
-            color: activeColor,
-            dests: getLegalMoves(),
+            color: (state.gameMode === 'vs-computer') ? (state.isGameOver ? undefined : state.playerColor) : activeColor,
+            dests: state.isGameOver ? new Map() : getLegalMoves(),
             showDests: true
           }
         });
@@ -420,7 +460,21 @@ function handleMoveExecution(parsed) {
         if (isTTSEnabled()) {
           speak(formatMoveForSpeech(move.san, move.piece, move.from, move.to, move.flags));
         }
-        if (state.engineReady) {
+
+        if (state.gameMode === 'vs-computer') {
+          updateGameStatus();
+          if (!state.isGameOver) {
+            makeComputerMove();
+          }
+          return;
+        }
+
+        if (state.gameMode === 'local-1v1') {
+          updateGameStatus();
+          return;
+        }
+
+        if (state.engineReady && !state.analysisPaused) {
           startAnalysis(state.currentFen, {
             depth: state.settings.depth,
             multiPV: state.settings.multiPV,
@@ -548,9 +602,21 @@ function validateFen(fen) {
 function updateAnalysisUI(result) {
   if (!result) return;
   
+  // Determine perspective
+  let perspective = state.settings.analysisSide || 'white';
+  if (perspective === 'auto') {
+    perspective = state.chess ? (state.chess.turn() === 'w' ? 'white' : 'black') : 'white';
+  }
+
   const eval_ = result.evaluation || {};
-  const cp = eval_.cp;
-  const mate = eval_.mate;
+  let cp = eval_.cp;
+  let mate = eval_.mate;
+  
+  // Flip eval values if viewing from black's perspective
+  if (perspective === 'black') {
+    if (cp !== null && cp !== undefined) cp = -cp;
+    if (mate !== null && mate !== undefined) mate = -mate;
+  }
   
   // Update eval bar
   if (els.evalBarFill) {
@@ -560,12 +626,12 @@ function updateAnalysisUI(result) {
   
   // Update eval score display
   if (els.evalScore) {
-    const human = evalToHuman(cp, mate);
+    const human = evalToHuman(eval_.cp, eval_.mate, perspective);
     els.evalScore.textContent = human.short;
     els.evalScore.title = human.text;
-    const isWhiteLead = (cp > 0) || (mate > 0);
-    const isBlackLead = (cp < 0) || (mate < 0);
-    els.evalScore.className = `hud-eval-badge ${isWhiteLead ? 'white-lead' : (isBlackLead ? 'black-lead' : '')}`;
+    const isLead = (cp > 0) || (mate > 0);
+    const isTrail = (cp < 0) || (mate < 0);
+    els.evalScore.className = `hud-eval-badge ${isLead ? 'white-lead' : (isTrail ? 'black-lead' : '')}`;
   }
   
   // Update depth display
@@ -594,14 +660,18 @@ function updateAnalysisUI(result) {
       if (!line || !line.pv || !line.pv[0]) return;
       const li = document.createElement('li');
       li.className = 'candidate-item';
-      const lineEval = evalToHuman(line.cp, line.mate);
+      const lineCp = perspective === 'black' && line.cp != null ? -line.cp : line.cp;
+      const lineMate = perspective === 'black' && line.mate != null ? -line.mate : line.mate;
+      const lineEval = evalToHuman(line.cp, line.mate, perspective);
+      const isLead = (lineCp > 0) || (lineMate > 0);
+      const isTrail = (lineCp < 0) || (lineMate < 0);
       li.innerHTML = `
         <div style="display: flex; align-items: center; gap: 8px;">
           <span style="font-weight: bold; color: var(--text-muted); font-size: 0.78rem;">#${i + 1}</span>
           <span class="move-name">${line.pv[0]}</span>
           <span class="pv-preview">${line.pv.slice(1, 6).join(' ')}</span>
         </div>
-        <span class="hud-eval-badge ${line.cp > 0 ? 'white-lead' : (line.cp < 0 ? 'black-lead' : '')}">${lineEval.short}</span>
+        <span class="hud-eval-badge ${isLead ? 'white-lead' : (isTrail ? 'black-lead' : '')}">${lineEval.short}</span>
       `;
       els.candidateMoves.appendChild(li);
     });
@@ -629,14 +699,225 @@ function onAnalysisUpdate(result) {
 function onBestMove(result) {
   updateAnalysisUI(result);
   
+  // VS Computer: auto-execute the engine's best move when it's the computer's turn
+  if (state.gameMode === 'vs-computer' && !state.isGameOver && result.bestMove) {
+    const isComputerTurn =
+      (state.chess.turn() === 'w' && state.playerColor !== 'white') ||
+      (state.chess.turn() === 'b' && state.playerColor !== 'black');
+
+    if (isComputerTurn) {
+      const move = parseUCIMove(result.bestMove);
+      if (move) {
+        const chessMove = state.chess.move({
+          from: move.from,
+          to: move.to,
+          promotion: move.promotion || 'q',
+        });
+        if (chessMove) {
+          state.currentFen = state.chess.fen();
+          const activeColor = state.chess.turn() === 'w' ? 'white' : 'black';
+          state.ground.set({
+            fen: state.chess.fen(),
+            turnColor: activeColor,
+            lastMove: [move.from, move.to],
+            movable: {
+              free: false,
+              color: state.isGameOver ? undefined : state.playerColor,
+              dests: state.isGameOver ? new Map() : getLegalMoves(),
+              showDests: true,
+            },
+          });
+          updateGameStatus();
+
+          if (isTTSEnabled()) {
+            speak(`Computer plays ${result.bestMove}`);
+          }
+          return;
+        }
+      }
+    }
+  }
+
   if (isTTSEnabled() && result.bestMove) {
+    let perspective = state.settings.analysisSide || 'white';
+    if (perspective === 'auto') {
+      perspective = state.chess ? (state.chess.turn() === 'w' ? 'white' : 'black') : 'white';
+    }
     const eval_ = result.evaluation || {};
-    const human = evalToHuman(eval_.cp, eval_.mate);
+    const human = evalToHuman(eval_.cp, eval_.mate, perspective);
     speak(`Best move: ${result.bestMove}. ${human.text}`);
   }
   
   if (els.analyzeBtn) els.analyzeBtn.disabled = false;
   if (els.stopBtn) els.stopBtn.style.display = 'none';
+}
+
+const DIFFICULTY_DEPTHS = { 1: 3, 2: 6, 3: 10, 4: 15, 5: 20, 6: 25 };
+
+function switchGameMode(mode) {
+  state.gameMode = mode;
+  state.isGameOver = false;
+
+  // Update mode buttons
+  if (els.modeSelectorBtns) {
+    els.modeSelectorBtns.forEach(btn => {
+      const isActive = btn.dataset.mode === mode;
+      btn.classList.toggle('active', isActive);
+      btn.setAttribute('aria-selected', isActive ? 'true' : 'false');
+    });
+  }
+
+  // Show/hide mode panels
+  if (els.vsComputerPanel) els.vsComputerPanel.classList.toggle('hidden', mode !== 'vs-computer');
+  if (els.local1v1Panel) els.local1v1Panel.classList.toggle('hidden', mode !== 'local-1v1');
+
+  // Show/hide analysis-specific HUD controls
+  const analysisOnlyEls = [els.analyzeBtn, els.stopBtn, els.depthDisplay];
+  analysisOnlyEls.forEach(el => {
+    if (el) el.style.display = mode === 'analysis' ? '' : 'none';
+  });
+
+  // Show/hide game status bar
+  if (els.gameStatusBar) {
+    els.gameStatusBar.classList.toggle('hidden', mode === 'analysis');
+  }
+
+  // Show/hide editing controls (palette, free move, clear board) — only in analysis
+  const editControls = document.querySelector('.quick-actions-bar');
+  const paletteControls = document.querySelector('.piece-palette-deck');
+  if (editControls) editControls.style.display = mode === 'analysis' ? '' : 'none';
+  if (paletteControls) paletteControls.style.display = mode === 'analysis' ? '' : 'none';
+
+  if (mode === 'analysis') {
+    // Restore analysis mode
+    state.freePlacement = false;
+    if (els.freeModeBtn) els.freeModeBtn.textContent = '✋ Free Move: OFF';
+    const activeColor = state.chess.turn() === 'w' ? 'white' : 'black';
+    state.ground.set({
+      fen: state.chess.fen(),
+      turnColor: activeColor,
+      movable: {
+        free: false,
+        color: activeColor,
+        dests: getLegalMoves(),
+        showDests: true,
+      },
+      events: { move: handleBoardMove, select: handleBoardSelect },
+    });
+    state.analysisPaused = false;
+    triggerDebouncedAnalysis(100);
+  } else if (mode === 'vs-computer') {
+    startNewGame('vs-computer');
+  } else if (mode === 'local-1v1') {
+    startNewGame('local-1v1');
+  }
+}
+
+function startNewGame(mode) {
+  stopAnalysis();
+  state.chess = new Chess();
+  state.currentFen = STARTING_FEN;
+  state.isGameOver = false;
+  state.ground.setAutoShapes([]);
+
+  if (mode === 'vs-computer') {
+    let color = els.playAsColor ? els.playAsColor.value : 'white';
+    if (color === 'random') color = Math.random() < 0.5 ? 'white' : 'black';
+    state.playerColor = color;
+    state.difficulty = parseInt(els.difficultyLevel ? els.difficultyLevel.value : '3', 10) || 3;
+
+    state.boardOrientation = state.playerColor;
+    state.ground.set({
+      orientation: state.playerColor,
+      fen: state.chess.fen(),
+      turnColor: 'white',
+      lastMove: null,
+      movable: {
+        free: false,
+        color: state.playerColor,
+        dests: state.playerColor === 'white' ? getLegalMoves() : new Map(),
+        showDests: true,
+      },
+      events: { move: handleBoardMove, select: handleBoardSelect },
+    });
+
+    updateGameStatus();
+    if (els.resignBtn) els.resignBtn.style.display = '';
+    if (els.newGameAgainBtn) els.newGameAgainBtn.style.display = 'none';
+
+    if (state.playerColor === 'black') {
+      makeComputerMove();
+    }
+  } else if (mode === 'local-1v1') {
+    state.boardOrientation = 'white';
+    state.ground.set({
+      orientation: 'white',
+      fen: state.chess.fen(),
+      turnColor: 'white',
+      lastMove: null,
+      movable: {
+        free: false,
+        color: 'white',
+        dests: getLegalMoves(),
+        showDests: true,
+      },
+      events: { move: handleBoardMove, select: handleBoardSelect },
+    });
+
+    updateGameStatus();
+    if (els.resignBtn) els.resignBtn.style.display = 'none';
+    if (els.newGameAgainBtn) els.newGameAgainBtn.style.display = 'none';
+  }
+
+  showToast('New game started!', 'success', 2000);
+}
+
+function updateGameStatus() {
+  if (!els.gameStatusText) return;
+
+  if (state.chess.isCheckmate()) {
+    const winner = state.chess.turn() === 'w' ? 'Black' : 'White';
+    els.gameStatusText.textContent = `Checkmate! ${winner} wins.`;
+    state.isGameOver = true;
+    if (els.resignBtn) els.resignBtn.style.display = 'none';
+    if (els.newGameAgainBtn) els.newGameAgainBtn.style.display = '';
+    state.ground.set({ movable: { color: undefined, dests: new Map() } });
+    showToast(`Checkmate! ${winner} wins!`, 'success', 3000);
+    return;
+  }
+  if (state.chess.isDraw()) {
+    let reason = 'Draw';
+    if (state.chess.isStalemate()) reason = 'Draw by Stalemate';
+    else if (state.chess.isThreefoldRepetition()) reason = 'Draw by Repetition';
+    else if (state.chess.isInsufficientMaterial()) reason = 'Draw by Insufficient Material';
+    els.gameStatusText.textContent = reason;
+    state.isGameOver = true;
+    if (els.resignBtn) els.resignBtn.style.display = 'none';
+    if (els.newGameAgainBtn) els.newGameAgainBtn.style.display = '';
+    state.ground.set({ movable: { color: undefined, dests: new Map() } });
+    showToast(reason, 'info', 3000);
+    return;
+  }
+
+  const currentTurn = state.chess.turn() === 'w' ? 'White' : 'Black';
+  const inCheck = state.chess.isCheck() ? ' (Check!)' : '';
+
+  if (state.gameMode === 'vs-computer') {
+    const isPlayerTurn = (state.chess.turn() === 'w' && state.playerColor === 'white') ||
+                         (state.chess.turn() === 'b' && state.playerColor === 'black');
+    els.gameStatusText.textContent = isPlayerTurn
+      ? `Your turn (${currentTurn})${inCheck}`
+      : `Computer thinking...`;
+  } else {
+    els.gameStatusText.textContent = `${currentTurn}'s turn${inCheck}`;
+  }
+}
+
+function makeComputerMove() {
+  if (state.isGameOver || !state.engineReady) return;
+  updateGameStatus();
+  const depth = DIFFICULTY_DEPTHS[state.difficulty] || 10;
+  startAnalysis(state.chess.fen(), { depth, multiPV: 1 });
 }
 
 async function handleModeToggle() {
@@ -719,11 +1000,39 @@ function getLegalMoves() {
 }
 
 function bindEvents() {
-  // Mode Toggle
-  if (els.modeToggleBtn) {
-    els.modeToggleBtn.addEventListener('click', handleModeToggle);
+  // Game Mode Selector
+  if (els.modeSelectorBtns) {
+    els.modeSelectorBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        switchGameMode(btn.dataset.mode);
+      });
+    });
   }
-  
+
+  // New Game & Resign Buttons
+  if (els.newGameBtn) {
+    els.newGameBtn.addEventListener('click', () => startNewGame('vs-computer'));
+  }
+  if (els.new1v1Btn) {
+    els.new1v1Btn.addEventListener('click', () => startNewGame('local-1v1'));
+  }
+  if (els.resignBtn) {
+    els.resignBtn.addEventListener('click', () => {
+      state.isGameOver = true;
+      const winner = state.playerColor === 'white' ? 'Black' : 'White';
+      if (els.gameStatusText) els.gameStatusText.textContent = `You resigned. ${winner} wins.`;
+      if (els.resignBtn) els.resignBtn.style.display = 'none';
+      if (els.newGameAgainBtn) els.newGameAgainBtn.style.display = '';
+      state.ground.set({ movable: { color: undefined, dests: new Map() } });
+      showToast(`You resigned. ${winner} wins.`, 'info', 3000);
+    });
+  }
+  if (els.newGameAgainBtn) {
+    els.newGameAgainBtn.addEventListener('click', () => {
+      startNewGame(state.gameMode);
+    });
+  }
+
   // Analyze Button
   if (els.analyzeBtn) {
     els.analyzeBtn.addEventListener('click', async () => {
@@ -743,6 +1052,7 @@ function bindEvents() {
         return;
       }
       
+      state.analysisPaused = false;
       els.analyzeBtn.disabled = true;
       if (els.stopBtn) els.stopBtn.style.display = 'inline-block';
       
@@ -764,7 +1074,11 @@ function bindEvents() {
   if (els.stopBtn) {
     els.stopBtn.addEventListener('click', () => {
       stopAnalysis();
-      if (els.analyzeBtn) els.analyzeBtn.disabled = false;
+      state.analysisPaused = true;
+      if (els.analyzeBtn) {
+        els.analyzeBtn.disabled = false;
+        els.analyzeBtn.textContent = '⚡ Analyze';
+      }
       els.stopBtn.style.display = 'none';
     });
   }
@@ -781,35 +1095,33 @@ function bindEvents() {
   if (els.depthSlider) {
     els.depthSlider.value = state.settings.depth;
     if (els.depthValue) els.depthValue.textContent = state.settings.depth;
+    if (els.depthDisplay) els.depthDisplay.textContent = `Depth: ${state.settings.depth}`;
     
     els.depthSlider.addEventListener('input', (e) => {
       const v = parseInt(e.target.value, 10);
       state.settings.depth = v;
       if (els.depthValue) els.depthValue.textContent = v;
+      if (els.depthDisplay) els.depthDisplay.textContent = `Depth: ${v}`;
       setDepth(v);
       saveSettings();
     });
   }
-  
-  // Voice Toggle
-  if (els.voiceToggleBtn) {
-    els.voiceToggleBtn.addEventListener('click', async () => {
-      if (!state.voiceSupported || !state.voiceSupported.supported) {
-        showToast('Voice control not supported in this browser', 'error');
-        return;
-      }
-      
-      if (isListening()) {
-        stopListening();
-        els.voiceToggleBtn.classList.remove('active');
-        showToast('Voice disabled');
-      } else {
-        try {
-          await startListening();
-          els.voiceToggleBtn.classList.add('active');
-          showToast('Voice enabled - Listening...', 'success');
-        } catch (e) {
-          showToast('Failed to start voice control', 'error');
+
+  // Analysis Side (Perspective) Select
+  if (els.analysisSideSelect) {
+    els.analysisSideSelect.value = state.settings.analysisSide || 'white';
+    els.analysisSideSelect.addEventListener('change', (e) => {
+      state.settings.analysisSide = e.target.value;
+      saveSettings();
+      if (state.engineReady && !state.analysisPaused && state.gameMode === 'analysis') {
+        const fen = getFenFromBoard();
+        const validation = validateFen(fen);
+        if (validation.valid) {
+          startAnalysis(fen, {
+            depth: state.settings.depth,
+            multiPV: state.settings.multiPV,
+            threads: state.settings.threads
+          });
         }
       }
     });
@@ -817,7 +1129,6 @@ function bindEvents() {
   
   // TTS Toggle
   if (els.ttsToggleBtn) {
-    // initialize state
     setTTSEnabled(state.settings.ttsEnabled);
     if (state.settings.ttsEnabled) {
       els.ttsToggleBtn.classList.add('active');
@@ -848,12 +1159,19 @@ function bindEvents() {
     els.startingPosBtn.addEventListener('click', handleResetStartingPosition);
   }
 
-  // Settings Modal Toggle
+  // Settings Modal Toggle & Backdrop Close
   if (els.settingsBtn && els.settingsModal) {
     els.settingsBtn.addEventListener('click', () => els.settingsModal.classList.remove('hidden'));
   }
   if (els.closeSettingsBtn && els.settingsModal) {
     els.closeSettingsBtn.addEventListener('click', () => els.settingsModal.classList.add('hidden'));
+  }
+  if (els.settingsModal) {
+    els.settingsModal.addEventListener('click', (e) => {
+      if (e.target === els.settingsModal) {
+        els.settingsModal.classList.add('hidden');
+      }
+    });
   }
   if (els.themeToggle) {
     els.themeToggle.value = state.settings.theme;
@@ -881,9 +1199,11 @@ function bindEvents() {
   }
   if (els.ttsSpeedInput) {
     els.ttsSpeedInput.value = state.settings.ttsSpeed || 1.0;
+    if (els.ttsSpeedValue) els.ttsSpeedValue.textContent = (state.settings.ttsSpeed || 1.0).toFixed(1);
     els.ttsSpeedInput.addEventListener('input', (e) => {
       const rate = parseFloat(e.target.value) || 1.0;
       state.settings.ttsSpeed = rate;
+      if (els.ttsSpeedValue) els.ttsSpeedValue.textContent = rate.toFixed(1);
       setRate(rate);
       saveSettings();
     });
@@ -1020,7 +1340,6 @@ function bindEvents() {
   };
 
   if (els.helpBtn) els.helpBtn.addEventListener('click', openHelp);
-  if (els.helpToolBtn) els.helpToolBtn.addEventListener('click', openHelp);
   if (els.closeHelpBtn) els.closeHelpBtn.addEventListener('click', closeHelp);
   if (els.helpModal) {
     els.helpModal.addEventListener('click', (e) => {
@@ -1090,6 +1409,15 @@ async function init() {
     loadSettings();
     applyTheme();
     initDOM();
+    
+    // Sync initial UI controls with loaded settings
+    if (els.depthSlider) els.depthSlider.value = state.settings.depth;
+    if (els.depthValue) els.depthValue.textContent = state.settings.depth;
+    if (els.depthDisplay) els.depthDisplay.textContent = `Depth: ${state.settings.depth}`;
+    if (els.analysisSideSelect) els.analysisSideSelect.value = state.settings.analysisSide || 'white';
+    if (els.ttsSpeedInput) els.ttsSpeedInput.value = state.settings.ttsSpeed || 1.0;
+    if (els.ttsSpeedValue) els.ttsSpeedValue.textContent = (state.settings.ttsSpeed || 1.0).toFixed(1);
+    if (els.multiPvInput) els.multiPvInput.value = state.settings.multiPV || 3;
     
     // 1. Initialize Chess.js
     try {
@@ -1204,11 +1532,6 @@ async function init() {
         onError: (err) => showToast(`Voice Error: ${err}`, 'warning')
       });
       state.voiceSupported = voiceSupport;
-      
-      if ((!voiceSupport || !voiceSupport.supported) && els.voiceToggleBtn) {
-        els.voiceToggleBtn.disabled = true;
-        els.voiceToggleBtn.title = "Voice recognition not supported in this browser";
-      }
     } catch (e) {
       console.warn('Voice initialization failed', e);
     }

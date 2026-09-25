@@ -376,71 +376,8 @@ cg-board piece.dragging {
 }
 
 /* ==========================================================================
-   Tabbed Control Deck
+   Candidate Moves Panel
    ========================================================================== */
-
-.control-deck {
-  width: 100%;
-  max-width: var(--board-max-width);
-  margin: 0 auto;
-  background-color: var(--bg-surface);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-md);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-/* Segmented Tab Headers */
-.tab-bar {
-  display: flex;
-  background-color: var(--bg-app);
-  border-bottom: 1px solid var(--border-default);
-  padding: 3px;
-  gap: 3px;
-  overflow-x: auto;
-}
-
-.tab-btn {
-  flex: 1;
-  min-height: 38px;
-  padding: 6px 10px;
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: var(--text-secondary);
-  border-radius: var(--radius-sm);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  white-space: nowrap;
-  transition: all 0.2s ease;
-}
-
-.tab-btn:hover {
-  color: var(--text-main);
-  background-color: rgba(255, 255, 255, 0.04);
-}
-
-.tab-btn.active {
-  color: var(--text-main);
-  background-color: var(--bg-surface);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
-}
-
-/* Tab Panels */
-.tab-panel {
-  padding: 14px;
-  display: none;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.tab-panel.active {
-  display: flex;
-}
-
-/* --- Tab 1: Analysis --- */
 .candidate-list {
   list-style: none;
   display: flex;
@@ -457,11 +394,17 @@ cg-board piece.dragging {
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-sm);
   font-size: 0.85rem;
+  transition: background-color 0.15s ease;
+}
+
+.candidate-item:hover {
+  background-color: var(--border-default);
 }
 
 .candidate-item .move-name {
   font-weight: 700;
-  color: var(--accent-emerald);
+  color: var(--accent-blue);
+  font-size: 0.95rem;
 }
 
 .candidate-item .pv-preview {
@@ -473,32 +416,9 @@ cg-board piece.dragging {
   white-space: nowrap;
 }
 
-.analysis-sliders {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  padding-top: 8px;
-  border-top: 1px solid var(--border-subtle);
-}
-
-.slider-group {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  font-size: 0.75rem;
-  color: var(--text-secondary);
-}
-
-.slider-group input[type="range"] {
-  accent-color: var(--accent-emerald);
-}
-
-/* --- Tab 2: Voice & Type --- */
-.voice-type-deck {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
+/* ==========================================================================
+   Voice & Type Bar
+   ========================================================================== */
 
 .type-input-group {
   display: flex;
@@ -571,64 +491,7 @@ cg-board piece.dragging {
   100% { transform: scale(1.02); box-shadow: 0 0 16px rgba(244, 63, 94, 0.8); }
 }
 
-.voice-hints {
-  background-color: var(--bg-elevated);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-sm);
-  padding: 8px 12px;
-  font-size: 0.78rem;
-  color: var(--text-secondary);
-  line-height: 1.5;
-}
-
-.voice-hints code {
-  color: var(--accent-emerald);
-  background-color: rgba(255, 255, 255, 0.05);
-  padding: 1px 4px;
-  border-radius: 3px;
-}
-
-/* --- Tab 3: Edit Board --- */
-.edit-board-deck {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.free-place-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  background-color: var(--bg-elevated);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-sm);
-  padding: 10px 12px;
-}
-
-.free-place-bar .title {
-  font-size: 0.88rem;
-  font-weight: 600;
-}
-
-.toggle-switch-btn {
-  height: 32px;
-  padding: 0 12px;
-  border-radius: var(--radius-full);
-  background-color: var(--bg-surface);
-  border: 1px solid var(--border-default);
-  font-size: 0.78rem;
-  font-weight: 600;
-  color: var(--text-secondary);
-  transition: all 0.2s ease;
-}
-
-.toggle-switch-btn.active {
-  background-color: var(--accent-emerald);
-  color: #ffffff;
-  border-color: var(--accent-emerald);
-}
-
-/* 2-Row Palette */
+/* Piece Palette Deck */
 .piece-palette-deck {
   display: flex;
   flex-direction: column;
@@ -676,12 +539,6 @@ cg-board piece.dragging {
   background-color: rgba(244, 63, 94, 0.15) !important;
 }
 
-.edit-actions-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-}
-
 .action-btn {
   height: 36px;
   border-radius: var(--radius-sm);
@@ -696,134 +553,6 @@ cg-board piece.dragging {
 .action-btn:hover {
   color: var(--text-main);
   border-color: var(--text-secondary);
-}
-
-/* FEN Box */
-.fen-box-wrapper {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.fen-box {
-  width: 100%;
-  height: 60px;
-  background-color: var(--bg-input);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-sm);
-  padding: 6px 10px;
-  font-size: 0.75rem;
-  font-family: monospace;
-  color: var(--text-secondary);
-  resize: none;
-}
-
-.fen-btn-row {
-  display: flex;
-  gap: 6px;
-}
-
-.fen-btn-row button {
-  flex: 1;
-  height: 30px;
-  border-radius: var(--radius-sm);
-  background-color: var(--bg-elevated);
-  border: 1px solid var(--border-default);
-  font-size: 0.75rem;
-  color: var(--text-secondary);
-}
-
-/* --- Tab 4: Move History --- */
-.history-deck {
-  min-height: 120px;
-  max-height: 200px;
-  overflow-y: auto;
-  font-size: 0.82rem;
-  color: var(--text-secondary);
-}
-
-.history-list {
-  list-style: none;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
-  gap: 4px;
-}
-
-/* ==========================================================================
-   Mobile Bottom Navigation Dock
-   ========================================================================== */
-
-.mobile-dock {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: var(--dock-height);
-  background-color: var(--bg-surface);
-  border-top: 1px solid var(--border-default);
-  display: flex;
-  align-items: center;
-  justify-content: space-around;
-  padding: 0 8px;
-  z-index: 100;
-}
-
-.dock-btn {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 2px;
-  color: var(--text-secondary);
-  font-size: 0.7rem;
-  font-weight: 500;
-  min-width: 48px;
-  height: 100%;
-  transition: color 0.2s ease;
-}
-
-.dock-btn .dock-icon {
-  font-size: 18px;
-  line-height: 1;
-}
-
-.dock-btn:hover, .dock-btn.active {
-  color: var(--accent-emerald);
-}
-
-/* ==========================================================================
-   Desktop Responsive Layout (>= 1024px)
-   ========================================================================== */
-
-@media (min-width: 1024px) {
-  :root {
-    --dock-height: 0px;
-  }
-  
-  .mobile-dock {
-    display: none;
-  }
-  
-  .app-content {
-    flex-direction: row;
-    align-items: flex-start;
-    justify-content: center;
-    padding: 24px;
-    gap: 28px;
-  }
-  
-  .board-container-card {
-    flex: 0 0 520px;
-    max-width: 520px;
-    margin: 0;
-  }
-  
-  .control-deck {
-    flex: 1;
-    max-width: 480px;
-    margin: 0;
-    min-height: 520px;
-  }
 }
 
 /* ==========================================================================
@@ -1103,4 +832,110 @@ cg-board piece.dragging {
   font-family: monospace;
   color: var(--text-main);
   font-size: 0.75rem;
+}
+
+/* ==========================================================================
+   Game Mode Selector
+   ========================================================================== */
+
+.mode-selector-bar {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  background: var(--bg-app);
+  border-radius: var(--radius-md);
+  margin-bottom: 4px;
+}
+
+.mode-btn {
+  flex: 1;
+  padding: 8px 4px;
+  background: transparent;
+  color: var(--text-muted);
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-family: var(--font-sans);
+  white-space: nowrap;
+}
+
+.mode-btn:hover {
+  color: var(--text-secondary);
+  background: var(--bg-elevated);
+}
+
+.mode-btn.active {
+  background: var(--accent-emerald-bg);
+  color: var(--accent-emerald);
+}
+
+.mode-panel {
+  padding: 8px 0;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.mode-panel.hidden {
+  display: none;
+}
+
+.setting-row.compact {
+  padding: 6px 0;
+}
+
+.setting-row.compact label {
+  font-size: 0.82rem;
+}
+
+.setting-row.compact select {
+  font-size: 0.82rem;
+  padding: 4px 8px;
+}
+
+.action-btn.btn-primary {
+  background: var(--accent-emerald);
+  color: #fff;
+  border: none;
+  font-weight: 600;
+}
+
+.action-btn.btn-primary:hover {
+  background: var(--accent-emerald-hover);
+}
+
+.action-btn.btn-sm {
+  padding: 4px 12px;
+  font-size: 0.78rem;
+  height: 30px;
+}
+
+.game-status-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: var(--bg-elevated);
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+  color: var(--text-main);
+  margin-top: 6px;
+}
+
+.game-status-bar.hidden {
+  display: none;
+}
+
+/* ==========================================================================
+   Tactile Button Press Feedback
+   ========================================================================== */
+
+.action-btn:active,
+.mode-btn:active,
+.icon-btn:active,
+.hud-pill-btn:active,
+.palette-item:active {
+  transform: scale(0.96);
+  transition: transform 0.05s ease;
 }
