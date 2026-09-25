@@ -1043,6 +1043,56 @@ cg-board piece.dragging {
   display: none;
 }
 
+.player-right-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.player-clock {
+  font-family: ui-monospace, SFMono-Regular, "Roboto Mono", Menlo, Consolas, monospace;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  padding: 3px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  color: var(--text-secondary);
+  min-width: 62px;
+  text-align: center;
+  transition: all 0.15s ease;
+  line-height: 1.2;
+}
+
+.player-clock.active {
+  background: #1e293b;
+  border-color: var(--accent-emerald);
+  color: #ffffff;
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.4);
+}
+
+.player-clock.low-time {
+  border-color: var(--accent-red);
+  color: var(--accent-red);
+  animation: clock-pulse 1s infinite alternate;
+}
+
+@keyframes clock-pulse {
+  from {
+    background: rgba(244, 63, 94, 0.1);
+    box-shadow: 0 0 4px rgba(244, 63, 94, 0.3);
+  }
+  to {
+    background: rgba(244, 63, 94, 0.25);
+    box-shadow: 0 0 12px rgba(244, 63, 94, 0.6);
+  }
+}
+
+.player-clock.hidden {
+  display: none;
+}
+
 /* ==========================================================================
    Move History Panel & Interactive Navigation
    ========================================================================== */

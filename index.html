@@ -69,9 +69,12 @@
                             <span id="top-player-badge" class="player-badge">Engine</span>
                         </div>
                     </div>
-                    <div class="player-material">
-                        <div id="top-captured-pieces" class="captured-tray" aria-label="Captured pieces"></div>
-                        <span id="top-material-diff" class="material-diff-badge hidden">+0</span>
+                    <div class="player-right-group">
+                        <div class="player-material">
+                            <div id="top-captured-pieces" class="captured-tray" aria-label="Captured pieces"></div>
+                            <span id="top-material-diff" class="material-diff-badge hidden">+0</span>
+                        </div>
+                        <div id="top-clock" class="player-clock hidden" aria-label="Opponent clock">10:00</div>
                     </div>
                 </div>
 
@@ -95,9 +98,12 @@
                             <span id="bottom-player-badge" class="player-badge">White</span>
                         </div>
                     </div>
-                    <div class="player-material">
-                        <div id="bottom-captured-pieces" class="captured-tray" aria-label="Captured pieces"></div>
-                        <span id="bottom-material-diff" class="material-diff-badge hidden">+0</span>
+                    <div class="player-right-group">
+                        <div class="player-material">
+                            <div id="bottom-captured-pieces" class="captured-tray" aria-label="Captured pieces"></div>
+                            <span id="bottom-material-diff" class="material-diff-badge hidden">+0</span>
+                        </div>
+                        <div id="bottom-clock" class="player-clock hidden" aria-label="Your clock">10:00</div>
                     </div>
                 </div>
 
@@ -163,6 +169,29 @@
                             <option value="6">Maximum (Depth 25)</option>
                         </select>
                     </div>
+                    <div class="setting-row compact">
+                        <label for="time-control-vs">Clock / Time</label>
+                        <select id="time-control-vs">
+                            <option value="none" selected>Untimed (No Clock)</option>
+                            <optgroup label="Bullet">
+                                <option value="1|0">1 min (1|0)</option>
+                                <option value="1|1">1 min + 1s (1|1)</option>
+                                <option value="2|1">2 min + 1s (2|1)</option>
+                            </optgroup>
+                            <optgroup label="Blitz">
+                                <option value="3|0">3 min (3|0)</option>
+                                <option value="3|2">3 min + 2s (3|2)</option>
+                                <option value="5|0">5 min (5|0)</option>
+                                <option value="5|3">5 min + 3s (5|3)</option>
+                                <option value="5|5">5 min + 5s (5|5)</option>
+                            </optgroup>
+                            <optgroup label="Rapid">
+                                <option value="10|0">10 min (10|0)</option>
+                                <option value="15|10">15 min + 10s (15|10)</option>
+                                <option value="30|0">30 min (30|0)</option>
+                            </optgroup>
+                        </select>
+                    </div>
                     <button id="new-game-btn" class="action-btn btn-primary" style="width: 100%; margin-top: 8px;">
                         ▶ New Game
                     </button>
@@ -173,6 +202,29 @@
                     <p style="color: var(--text-secondary); font-size: 0.85rem; margin: 4px 0 8px;">
                         Two players alternate turns on the same device.
                     </p>
+                    <div class="setting-row compact" style="margin-bottom: 8px;">
+                        <label for="time-control-1v1">Clock / Time</label>
+                        <select id="time-control-1v1">
+                            <option value="none" selected>Untimed (No Clock)</option>
+                            <optgroup label="Bullet">
+                                <option value="1|0">1 min (1|0)</option>
+                                <option value="1|1">1 min + 1s (1|1)</option>
+                                <option value="2|1">2 min + 1s (2|1)</option>
+                            </optgroup>
+                            <optgroup label="Blitz">
+                                <option value="3|0">3 min (3|0)</option>
+                                <option value="3|2">3 min + 2s (3|2)</option>
+                                <option value="5|0">5 min (5|0)</option>
+                                <option value="5|3">5 min + 3s (5|3)</option>
+                                <option value="5|5">5 min + 5s (5|5)</option>
+                            </optgroup>
+                            <optgroup label="Rapid">
+                                <option value="10|0">10 min (10|0)</option>
+                                <option value="15|10">15 min + 10s (15|10)</option>
+                                <option value="30|0">30 min (30|0)</option>
+                            </optgroup>
+                        </select>
+                    </div>
                     <button id="new-1v1-btn" class="action-btn btn-primary" style="width: 100%;">
                         ▶ New 1v1 Game
                     </button>

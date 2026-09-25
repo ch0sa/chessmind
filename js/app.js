@@ -34,6 +34,18 @@ const state = {
   selectedQuickPiece: null, // Selected piece from quick palette
   historyMoves: [],       // Array of { san, from, to, piece, flags, fen, color, turn }
   currentHistoryIndex: -1,// -1 is starting position, moves.length - 1 is latest move
+  clock: {
+    enabled: false,
+    timeControl: 'none',   // 'none' or 'min|inc' e.g. '3|2', '5|0'
+    initialMinutes: 0,
+    incrementSeconds: 0,
+    whiteTime: 0,          // in seconds
+    blackTime: 0,          // in seconds
+    activeColor: null,     // 'white' | 'black' | null
+    timerId: null,
+    lastTimestamp: 0,
+    isFlagged: false,
+  },
   settings: {
     theme: 'dark',
     soundEnabled: true,
@@ -90,6 +102,11 @@ function showToast(message, type = 'info', duration = 3000) {
     container.style.flexDirection = 'column';
     container.style.gap = '10px';
     document.body.appendChild(container);
+  }
+
+  // Clear existing toasts so they don't stack up and block UI
+  while (container.firstChild) {
+    container.removeChild(container.firstChild);
   }
 
   const toast = document.createElement('div');
@@ -170,19 +187,21 @@ function initDOM() {
   els.ttsSpeedInput = document.getElementById('tts-speed');
   els.ttsSpeedValue = document.getElementById('tts-speed-value');
 
-  // Player Info Strips & Captured Pieces
+  // Player Info Strips & Captured Pieces & Clocks
   els.topPlayerStrip = document.getElementById('top-player-strip');
   els.topPlayerName = document.getElementById('top-player-name');
   els.topPlayerBadge = document.getElementById('top-player-badge');
   els.topPlayerIcon = document.getElementById('top-player-icon');
   els.topCapturedPieces = document.getElementById('top-captured-pieces');
   els.topMaterialDiff = document.getElementById('top-material-diff');
+  els.topClock = document.getElementById('top-clock');
   els.bottomPlayerStrip = document.getElementById('bottom-player-strip');
   els.bottomPlayerName = document.getElementById('bottom-player-name');
   els.bottomPlayerBadge = document.getElementById('bottom-player-badge');
   els.bottomPlayerIcon = document.getElementById('bottom-player-icon');
   els.bottomCapturedPieces = document.getElementById('bottom-captured-pieces');
   els.bottomMaterialDiff = document.getElementById('bottom-material-diff');
+  els.bottomClock = document.getElementById('bottom-clock');
 
   // Move History & Navigation
   els.moveHistoryPanel = document.getElementById('move-history-panel');
@@ -202,6 +221,8 @@ function initDOM() {
   els.local1v1Panel = document.getElementById('local-1v1-panel');
   els.playAsColor = document.getElementById('play-as-color');
   els.difficultyLevel = document.getElementById('difficulty-level');
+  els.timeControlVs = document.getElementById('time-control-vs');
+  els.timeControl1v1 = document.getElementById('time-control-1v1');
   els.newGameBtn = document.getElementById('new-game-btn');
   els.new1v1Btn = document.getElementById('new-1v1-btn');
   els.gameStatusBar = document.getElementById('game-status-bar');
@@ -397,6 +418,12 @@ function handleBoardMove(orig, dest) {
       recordMoveInHistory(move);
       updatePlayerStripsUI();
 
+      if (state.clock.enabled && !state.isGameOver) {
+        const nextColor = state.chess.turn() === 'w' ? 'white' : 'black';
+        const movedColor = move.color === 'w' ? 'white' : 'black';
+        switchClockTurn(nextColor, movedColor);
+      }
+
       if (isTTSEnabled()) {
         speak(formatMoveForSpeech(move.san, move.piece, move.from, move.to, move.flags));
       }
@@ -512,6 +539,12 @@ function handleMoveExecution(parsed) {
         playMoveSoundFx(move);
         recordMoveInHistory(move);
         updatePlayerStripsUI();
+
+        if (state.clock.enabled && !state.isGameOver) {
+          const nextColor = state.chess.turn() === 'w' ? 'white' : 'black';
+          const movedColor = move.color === 'w' ? 'white' : 'black';
+          switchClockTurn(nextColor, movedColor);
+        }
 
         if (isTTSEnabled()) {
           speak(formatMoveForSpeech(move.san, move.piece, move.from, move.to, move.flags));
@@ -811,6 +844,12 @@ function onBestMove(result) {
           recordMoveInHistory(chessMove);
           updatePlayerStripsUI();
 
+          if (state.clock.enabled && !state.isGameOver) {
+            const nextColor = state.chess.turn() === 'w' ? 'white' : 'black';
+            const movedColor = chessMove.color === 'w' ? 'white' : 'black';
+            switchClockTurn(nextColor, movedColor);
+          }
+
           if (isTTSEnabled()) {
             speak(`Computer plays ${result.bestMove}`);
           }
@@ -998,6 +1037,186 @@ function updatePlayerStripsUI() {
       els.bottomMaterialDiff.classList.add('hidden');
     }
   }
+
+  // Update clocks whenever player strips update
+  updateClockUI();
+}
+
+// ============================================================================
+// Chess Clocks & Time Controls
+// ============================================================================
+function formatClockTime(seconds) {
+  if (isNaN(seconds) || seconds <= 0) {
+    return '00:00.0';
+  }
+  if (seconds < 20) {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    const tenths = Math.floor((seconds % 1) * 10);
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}.${tenths}`;
+  }
+  const totalSecs = Math.ceil(seconds);
+  const mins = Math.floor(totalSecs / 60);
+  const secs = totalSecs % 60;
+  return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+}
+
+function updateClockUI() {
+  if (!els.topClock || !els.bottomClock) return;
+
+  if (!state.clock.enabled || state.gameMode === 'analysis') {
+    els.topClock.classList.add('hidden');
+    els.bottomClock.classList.add('hidden');
+    return;
+  }
+
+  els.topClock.classList.remove('hidden');
+  els.bottomClock.classList.remove('hidden');
+
+  const topColor = state.boardOrientation === 'white' ? 'black' : 'white';
+  const bottomColor = state.boardOrientation;
+
+  const topTime = topColor === 'white' ? state.clock.whiteTime : state.clock.blackTime;
+  const bottomTime = bottomColor === 'white' ? state.clock.whiteTime : state.clock.blackTime;
+
+  els.topClock.textContent = formatClockTime(topTime);
+  els.bottomClock.textContent = formatClockTime(bottomTime);
+
+  const isTopActive = state.clock.activeColor === topColor && !state.isGameOver;
+  const isBottomActive = state.clock.activeColor === bottomColor && !state.isGameOver;
+
+  els.topClock.classList.toggle('active', isTopActive);
+  els.bottomClock.classList.toggle('active', isBottomActive);
+
+  els.topClock.classList.toggle('low-time', topTime < 20 && topTime > 0);
+  els.bottomClock.classList.toggle('low-time', bottomTime < 20 && bottomTime > 0);
+}
+
+function initClock(tc) {
+  stopClock();
+  state.clock.isFlagged = false;
+
+  if (!tc || tc === 'none') {
+    state.clock.enabled = false;
+    state.clock.timeControl = 'none';
+    state.clock.initialMinutes = 0;
+    state.clock.incrementSeconds = 0;
+    state.clock.whiteTime = 0;
+    state.clock.blackTime = 0;
+    state.clock.activeColor = null;
+    updateClockUI();
+    return;
+  }
+
+  const parts = tc.split('|');
+  const minutes = parseFloat(parts[0]) || 5;
+  const increment = parseFloat(parts[1]) || 0;
+
+  state.clock.enabled = true;
+  state.clock.timeControl = tc;
+  state.clock.initialMinutes = minutes;
+  state.clock.incrementSeconds = increment;
+  state.clock.whiteTime = minutes * 60;
+  state.clock.blackTime = minutes * 60;
+  state.clock.activeColor = null;
+  state.clock.lastTimestamp = performance.now();
+  updateClockUI();
+}
+
+function clockTick() {
+  if (!state.clock.enabled || !state.clock.activeColor || state.isGameOver) {
+    return;
+  }
+  const now = performance.now();
+  const delta = (now - state.clock.lastTimestamp) / 1000;
+  state.clock.lastTimestamp = now;
+
+  if (state.clock.activeColor === 'white') {
+    state.clock.whiteTime = Math.max(0, state.clock.whiteTime - delta);
+    if (state.clock.whiteTime <= 0) {
+      handleTimeout('white');
+      return;
+    }
+  } else if (state.clock.activeColor === 'black') {
+    state.clock.blackTime = Math.max(0, state.clock.blackTime - delta);
+    if (state.clock.blackTime <= 0) {
+      handleTimeout('black');
+      return;
+    }
+  }
+  updateClockUI();
+}
+
+function startClockFor(color) {
+  if (!state.clock.enabled || state.isGameOver) return;
+  state.clock.activeColor = color;
+  state.clock.lastTimestamp = performance.now();
+  if (!state.clock.timerId) {
+    state.clock.timerId = setInterval(clockTick, 50);
+  }
+  updateClockUI();
+}
+
+function switchClockTurn(nextColor, movedColor) {
+  if (!state.clock.enabled || state.isGameOver) return;
+  if (movedColor) {
+    if (movedColor === 'white') {
+      state.clock.whiteTime += state.clock.incrementSeconds;
+    } else if (movedColor === 'black') {
+      state.clock.blackTime += state.clock.incrementSeconds;
+    }
+  }
+  state.clock.activeColor = nextColor;
+  state.clock.lastTimestamp = performance.now();
+  if (!state.clock.timerId) {
+    state.clock.timerId = setInterval(clockTick, 50);
+  }
+  updateClockUI();
+}
+
+function stopClock() {
+  if (state.clock.timerId) {
+    clearInterval(state.clock.timerId);
+    state.clock.timerId = null;
+  }
+  state.clock.activeColor = null;
+  updateClockUI();
+}
+
+function handleTimeout(flaggedColor) {
+  stopClock();
+  state.isGameOver = true;
+  state.clock.isFlagged = true;
+  if (state.ground) {
+    state.ground.set({ movable: { color: undefined, dests: new Map() } });
+  }
+
+  const opponentColor = flaggedColor === 'white' ? 'black' : 'white';
+  const flaggedName = flaggedColor === 'white' ? 'White' : 'Black';
+  const opponentName = opponentColor === 'white' ? 'White' : 'Black';
+
+  playGameEndSound();
+
+  const isOpponentInsufficient = state.chess && state.chess.isInsufficientMaterial();
+  if (isOpponentInsufficient) {
+    const msg = `Draw - ${flaggedName} ran out of time vs insufficient material`;
+    if (els.gameStatusText) els.gameStatusText.textContent = msg;
+    showToast(msg, 'info', 4000);
+  } else {
+    let winnerText;
+    if (state.gameMode === 'vs-computer') {
+      winnerText = flaggedColor === state.playerColor ? 'Computer wins on time!' : 'You win on time!';
+    } else {
+      winnerText = `${opponentName} wins on time!`;
+    }
+    const msg = `Time out! ${winnerText}`;
+    if (els.gameStatusText) els.gameStatusText.textContent = msg;
+    showToast(msg, 'warning', 4000);
+  }
+
+  if (els.resignBtn) els.resignBtn.style.display = 'none';
+  if (els.newGameAgainBtn) els.newGameAgainBtn.style.display = '';
+  updateClockUI();
 }
 
 // Move History & Step Navigation
@@ -1207,6 +1426,9 @@ function switchGameMode(mode) {
 
   if (mode === 'analysis') {
     // Restore analysis mode
+    stopClock();
+    state.clock.enabled = false;
+    updateClockUI();
     state.freePlacement = false;
     if (els.freeModeBtn) els.freeModeBtn.textContent = '✋ Free Move: OFF';
     const activeColor = state.chess.turn() === 'w' ? 'white' : 'black';
@@ -1232,6 +1454,7 @@ function switchGameMode(mode) {
 
 function startNewGame(mode) {
   stopAnalysis();
+  stopClock();
   state.chess = new Chess();
   state.currentFen = STARTING_FEN;
   state.isGameOver = false;
@@ -1239,6 +1462,15 @@ function startNewGame(mode) {
   state.currentHistoryIndex = -1;
   state.ground.setAutoShapes([]);
   renderMoveHistoryUI();
+
+  if (mode === 'vs-computer' || mode === 'local-1v1') {
+    const tcSelect = mode === 'vs-computer' ? els.timeControlVs : els.timeControl1v1;
+    const tc = tcSelect ? tcSelect.value : 'none';
+    initClock(tc);
+  } else {
+    initClock('none');
+  }
+
   updatePlayerStripsUI();
 
   if (mode === 'vs-computer') {
@@ -1266,6 +1498,10 @@ function startNewGame(mode) {
     if (els.resignBtn) els.resignBtn.style.display = '';
     if (els.newGameAgainBtn) els.newGameAgainBtn.style.display = 'none';
 
+    if (state.clock.enabled) {
+      startClockFor('white');
+    }
+
     if (state.playerColor === 'black') {
       makeComputerMove();
     }
@@ -1288,6 +1524,10 @@ function startNewGame(mode) {
     updateGameStatus();
     if (els.resignBtn) els.resignBtn.style.display = 'none';
     if (els.newGameAgainBtn) els.newGameAgainBtn.style.display = 'none';
+
+    if (state.clock.enabled) {
+      startClockFor('white');
+    }
   }
 
   showToast('New game started!', 'success', 2000);
@@ -1297,6 +1537,7 @@ function updateGameStatus() {
   if (!els.gameStatusText) return;
 
   if (state.chess.isCheckmate()) {
+    stopClock();
     const winner = state.chess.turn() === 'w' ? 'Black' : 'White';
     els.gameStatusText.textContent = `Checkmate! ${winner} wins.`;
     state.isGameOver = true;
@@ -1307,6 +1548,7 @@ function updateGameStatus() {
     return;
   }
   if (state.chess.isDraw()) {
+    stopClock();
     let reason = 'Draw';
     if (state.chess.isStalemate()) reason = 'Draw by Stalemate';
     else if (state.chess.isThreefoldRepetition()) reason = 'Draw by Repetition';
@@ -1439,6 +1681,7 @@ function bindEvents() {
   }
   if (els.resignBtn) {
     els.resignBtn.addEventListener('click', () => {
+      stopClock();
       state.isGameOver = true;
       const winner = state.playerColor === 'white' ? 'Black' : 'White';
       if (els.gameStatusText) els.gameStatusText.textContent = `You resigned. ${winner} wins.`;
@@ -1451,6 +1694,28 @@ function bindEvents() {
   if (els.newGameAgainBtn) {
     els.newGameAgainBtn.addEventListener('click', () => {
       startNewGame(state.gameMode);
+    });
+  }
+
+  // Time Control Selectors
+  if (els.timeControlVs) {
+    els.timeControlVs.addEventListener('change', () => {
+      if (state.gameMode === 'vs-computer' && state.historyMoves.length === 0) {
+        initClock(els.timeControlVs.value);
+        if (state.clock.enabled) {
+          startClockFor('white');
+        }
+      }
+    });
+  }
+  if (els.timeControl1v1) {
+    els.timeControl1v1.addEventListener('change', () => {
+      if (state.gameMode === 'local-1v1' && state.historyMoves.length === 0) {
+        initClock(els.timeControl1v1.value);
+        if (state.clock.enabled) {
+          startClockFor('white');
+        }
+      }
     });
   }
 
