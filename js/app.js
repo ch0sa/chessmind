@@ -326,11 +326,34 @@ function triggerDebouncedAnalysis(delay = 250) {
       multiPV: state.settings.multiPV,
       threads: state.settings.threads
     });
+    updateAnalysisButtonUI(true);
   }, delay);
+}
+
+/**
+ * Centralized function to synchronize the Analyze/Stop button UI
+ * with the actual analysis running state.
+ * @param {boolean} isRunning - Whether analysis is currently active
+ */
+function updateAnalysisButtonUI(isRunning) {
+  if (isRunning) {
+    if (els.analyzeBtn) {
+      els.analyzeBtn.disabled = true;
+      els.analyzeBtn.textContent = '⚡ Analyzing...';
+    }
+    if (els.stopBtn) els.stopBtn.style.display = 'inline-block';
+  } else {
+    if (els.analyzeBtn) {
+      els.analyzeBtn.disabled = false;
+      els.analyzeBtn.textContent = '⚡ Analyze';
+    }
+    if (els.stopBtn) els.stopBtn.style.display = 'none';
+  }
 }
 
 function handleClearBoard() {
   stopAnalysis();
+  updateAnalysisButtonUI(false);
   if (analysisDebounceTimer) clearTimeout(analysisDebounceTimer);
   state.chess.clear();
   state.currentFen = '8/8/8/8/8/8/8/8 w - - 0 1';
@@ -361,6 +384,7 @@ function handleClearBoard() {
 
 function handleResetStartingPosition() {
   stopAnalysis();
+  updateAnalysisButtonUI(false);
   if (analysisDebounceTimer) clearTimeout(analysisDebounceTimer);
   state.chess.reset();
   state.currentFen = STARTING_FEN;
@@ -603,6 +627,7 @@ function handleMoveExecution(parsed) {
             multiPV: state.settings.multiPV,
             threads: state.settings.threads
           });
+          updateAnalysisButtonUI(true);
         }
         return;
       }
@@ -639,6 +664,7 @@ function handleMoveExecution(parsed) {
             multiPV: state.settings.multiPV,
             threads: state.settings.threads
           });
+          updateAnalysisButtonUI(true);
         }
         return;
       }
@@ -740,6 +766,7 @@ function handleMoveExecution(parsed) {
           multiPV: state.settings.multiPV,
           threads: state.settings.threads
         });
+        updateAnalysisButtonUI(true);
       }
       return;
     }
@@ -1527,6 +1554,7 @@ function handleImportData() {
     const validation = validateFen(raw);
     if (validation.valid) {
       stopAnalysis();
+      updateAnalysisButtonUI(false);
       stopClock();
       state.chess = new Chess(raw);
       state.currentFen = state.chess.fen();
@@ -1570,6 +1598,7 @@ function handleImportData() {
     const history = testChess.history({ verbose: true });
     if (history && history.length > 0) {
       stopAnalysis();
+      updateAnalysisButtonUI(false);
       stopClock();
       
       state.chess = new Chess();
@@ -1706,6 +1735,7 @@ function switchGameMode(mode) {
 
 function startNewGame(mode) {
   stopAnalysis();
+  updateAnalysisButtonUI(false);
   stopClock();
   state.chess = new Chess();
   state.currentFen = STARTING_FEN;
@@ -1881,13 +1911,13 @@ async function handleModeToggle() {
         multiPV: state.settings.multiPV,
         threads: state.settings.threads
       });
+      updateAnalysisButtonUI(true);
     }
     
   } else {
     // Switch to Setup
     stopAnalysis();
-    if (els.analyzeBtn) els.analyzeBtn.disabled = false;
-    if (els.stopBtn) els.stopBtn.style.display = 'none';
+    updateAnalysisButtonUI(false);
     
     state.mode = 'setup';
     document.body.setAttribute('data-mode', state.mode);
@@ -1992,8 +2022,7 @@ function bindEvents() {
       }
       
       state.analysisPaused = false;
-      els.analyzeBtn.disabled = true;
-      if (els.stopBtn) els.stopBtn.style.display = 'inline-block';
+      updateAnalysisButtonUI(true);
       
       try {
         await startAnalysis(fen, { 
@@ -2003,8 +2032,7 @@ function bindEvents() {
         });
       } catch (e) {
         showToast('Failed to start analysis', 'error');
-        els.analyzeBtn.disabled = false;
-        if (els.stopBtn) els.stopBtn.style.display = 'none';
+        updateAnalysisButtonUI(false);
       }
     });
   }
@@ -2014,11 +2042,7 @@ function bindEvents() {
     els.stopBtn.addEventListener('click', () => {
       stopAnalysis();
       state.analysisPaused = true;
-      if (els.analyzeBtn) {
-        els.analyzeBtn.disabled = false;
-        els.analyzeBtn.textContent = '⚡ Analyze';
-      }
-      els.stopBtn.style.display = 'none';
+      updateAnalysisButtonUI(false);
     });
   }
   
@@ -2155,6 +2179,7 @@ function bindEvents() {
             multiPV: state.settings.multiPV,
             threads: state.settings.threads
           });
+          updateAnalysisButtonUI(true);
         }
       }
     });
@@ -2226,6 +2251,7 @@ function bindEvents() {
           multiPV: state.settings.multiPV,
           threads: state.settings.threads
         });
+        updateAnalysisButtonUI(true);
       }
       showToast(`Candidate lines: ${val}`, 'info', 1500);
     });
@@ -2596,6 +2622,7 @@ async function init() {
             multiPV: state.settings.multiPV,
             threads: state.settings.threads
           });
+          updateAnalysisButtonUI(true);
         }
       },
       onAnalysisUpdate: (result) => {

@@ -762,16 +762,6 @@ cg-board piece.dragging {
   gap: 14px;
 }
 
-@media (min-width: 900px) {
-  .single-screen-layout {
-    display: grid;
-    grid-template-columns: minmax(360px, 480px) 1fr;
-    gap: 24px;
-    align-items: start;
-    padding: 20px 24px;
-  }
-}
-
 .unified-controls-card {
   display: flex;
   flex-direction: column;
@@ -779,12 +769,6 @@ cg-board piece.dragging {
   width: 100%;
   max-width: var(--board-max-width);
   margin: 0 auto;
-}
-
-@media (min-width: 900px) {
-  .unified-controls-card {
-    max-width: 100%;
-  }
 }
 
 .quick-actions-bar {
