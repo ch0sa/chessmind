@@ -2156,11 +2156,23 @@ function bindEvents() {
     
     els.depthSlider.addEventListener('input', (e) => {
       const v = parseInt(e.target.value, 10);
-      state.settings.depth = v;
       if (els.depthValue) els.depthValue.textContent = v;
       if (els.depthDisplay) els.depthDisplay.textContent = `Depth: ${v}`;
+    });
+
+    els.depthSlider.addEventListener('change', (e) => {
+      const v = parseInt(e.target.value, 10);
+      state.settings.depth = v;
       setDepth(v);
       saveSettings();
+      if (state.engineReady && !state.analysisPaused && state.gameMode === 'analysis') {
+        startAnalysis(state.currentFen, { 
+          depth: state.settings.depth, 
+          multiPV: state.settings.multiPV,
+          threads: state.settings.threads
+        });
+        updateAnalysisButtonUI(true);
+      }
     });
   }
 

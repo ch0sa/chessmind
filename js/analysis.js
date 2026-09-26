@@ -251,6 +251,12 @@ function handleEngineMessage(event) {
 
   const info = parseInfoLine(line);
   if (info && info.depth && info.pv) {
+    const isBlackToMove = analysisState.currentFen && analysisState.currentFen.split(' ')[1] === 'b';
+    if (isBlackToMove) {
+      if (info.cp !== null && info.cp !== undefined) info.cp = -info.cp;
+      if (info.mate !== null && info.mate !== undefined) info.mate = -info.mate;
+    }
+
     const pvIndex = (info.multipv || 1) - 1;
 
     while (analysisState.results.lines.length <= pvIndex) {
