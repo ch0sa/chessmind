@@ -181,6 +181,9 @@
                     <button class="mode-btn" data-mode="local-1v1" role="tab" aria-selected="false">
                         👥 1v1 Local
                     </button>
+                    <button class="mode-btn" data-mode="puzzles" role="tab" aria-selected="false">
+                        🧩 Puzzles
+                    </button>
                 </div>
                 
                 <!-- VS Computer Settings (hidden by default) -->
@@ -263,6 +266,38 @@
                     <button id="new-1v1-btn" class="action-btn btn-primary" style="width: 100%;">
                         ▶ New 1v1 Game
                     </button>
+                </div>
+
+                <!-- Tactical Puzzles Panel (hidden by default) -->
+                <div id="puzzle-panel" class="mode-panel hidden">
+                    <div class="puzzle-header-row" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <div class="puzzle-streak-badge" style="font-weight: 600; font-size: 0.9rem; color: var(--accent-emerald);">
+                            🔥 Streak: <span id="puzzle-streak">0</span> &nbsp;|&nbsp; Solved: <span id="puzzle-solved">0</span>
+                        </div>
+                        <div id="puzzle-theme-tag" class="badge" style="background: rgba(59, 130, 246, 0.2); color: #60a5fa; padding: 2px 8px; border-radius: 6px; font-size: 0.75rem; text-transform: uppercase;">
+                            TACTIC
+                        </div>
+                    </div>
+                    <div id="puzzle-prompt" style="padding: 8px 12px; background: rgba(255,255,255,0.04); border-radius: 8px; margin-bottom: 8px; font-size: 0.9rem; text-align: center; font-weight: 500;">
+                        Loading puzzle...
+                    </div>
+                    <div class="setting-row compact" style="margin-bottom: 8px;">
+                        <label for="puzzle-difficulty">Difficulty</label>
+                        <select id="puzzle-difficulty">
+                            <option value="all">All Difficulties</option>
+                            <option value="easy">Easy (800-1200)</option>
+                            <option value="medium" selected>Medium (1200-1600)</option>
+                            <option value="hard">Hard (1600+)</option>
+                        </select>
+                    </div>
+                    <div class="puzzle-actions-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px;">
+                        <button id="puzzle-hint-btn" class="action-btn" title="Highlight piece to move">
+                            💡 Hint
+                        </button>
+                        <button id="puzzle-next-btn" class="action-btn btn-primary" title="Skip to next puzzle">
+                            ⏭ Next Puzzle
+                        </button>
+                    </div>
                 </div>
 
                 <!-- 1-Click Action Buttons -->

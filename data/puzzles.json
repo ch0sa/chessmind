@@ -1,0 +1,712 @@
+[
+  {
+    "id": "ez01",
+    "fen": "r1bqkb1r/pppp1ppp/2n5/4p3/2B1n3/5N2/PPPP1PPP/RNBQK2R w KQkq - 0 4",
+    "moves": [
+      "c4f7",
+      "e8f7",
+      "f3e5"
+    ],
+    "rating": 900,
+    "theme": [
+      "fork",
+      "sacrifice"
+    ],
+    "description": "Punish the uncastled king",
+    "playerColor": "black"
+  },
+  {
+    "id": "ez02",
+    "fen": "r1bqk2r/pppp1ppp/2n2n2/2b1p3/2B1P3/2N2N2/PPPP1PPP/R1BQK2R w KQkq - 4 5",
+    "moves": [
+      "c4f7",
+      "e8f7",
+      "f3g5",
+      "f7g8"
+    ],
+    "rating": 950,
+    "theme": [
+      "attack",
+      "kingSafety"
+    ],
+    "description": "Opening attack on f7",
+    "playerColor": "black"
+  },
+  {
+    "id": "ez03",
+    "fen": "r1b1k2r/pppp1ppp/8/4n3/1b2q3/2N5/PPP1BPPP/R1BQK2R w KQkq - 0 8",
+    "moves": [
+      "e1g1",
+      "b4c3",
+      "b2c3"
+    ],
+    "rating": 850,
+    "theme": [
+      "pin",
+      "simplification"
+    ],
+    "description": "Break the pin on your king",
+    "playerColor": "black"
+  },
+  {
+    "id": "ez04",
+    "fen": "rnbqkb1r/pp3ppp/3p1n2/2p1p3/2B1P3/2N2N2/PPPP1PPP/R1BQK2R w KQkq - 0 5",
+    "moves": [
+      "f3g5",
+      "d6d5",
+      "c3d5"
+    ],
+    "rating": 1000,
+    "theme": [
+      "fork",
+      "f7attack"
+    ],
+    "description": "Target the weak f7 square",
+    "playerColor": "black"
+  },
+  {
+    "id": "ez05",
+    "fen": "6k1/5ppp/8/8/8/8/4RPPP/r5K1 w - - 0 1",
+    "moves": [
+      "e2e1",
+      "a1e1"
+    ],
+    "rating": 800,
+    "theme": [
+      "backRankMate",
+      "mateIn1"
+    ],
+    "description": "Deliver back-rank checkmate",
+    "playerColor": "black"
+  },
+  {
+    "id": "ez07",
+    "fen": "r1bqkbnr/pppp1ppp/2n5/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 2 3",
+    "moves": [
+      "f3e5",
+      "c6e5",
+      "d2d4"
+    ],
+    "rating": 900,
+    "theme": [
+      "fork",
+      "centerForkTrick"
+    ],
+    "description": "Regain the piece with a pawn fork",
+    "playerColor": "black"
+  },
+  {
+    "id": "ez08",
+    "fen": "r1bqk2r/ppppbppp/2n2n2/4p3/2B1P3/3P1N2/PPP2PPP/RNBQK2R w KQkq - 1 5",
+    "moves": [
+      "c4f7",
+      "e8f7",
+      "f3g5",
+      "f7g8"
+    ],
+    "rating": 1100,
+    "theme": [
+      "f7sacrifice",
+      "kingExpose"
+    ],
+    "description": "Expose Black's king",
+    "playerColor": "black"
+  },
+  {
+    "id": "ez09",
+    "fen": "r2qkb1r/pp1n1ppp/2p1pn2/5b2/2BP4/2N1PN2/PP3PPP/R1BQK2R w KQkq - 2 8",
+    "moves": [
+      "d4d5",
+      "e6d5",
+      "c4d5"
+    ],
+    "rating": 1000,
+    "theme": [
+      "pawnBreak",
+      "pin"
+    ],
+    "description": "Break open the center",
+    "playerColor": "black"
+  },
+  {
+    "id": "ez10",
+    "fen": "r1b1k2r/ppppqppp/2n2n2/4p3/1b2P3/2NP1N2/PPP1BPPP/R1BQK2R w KQkq - 3 6",
+    "moves": [
+      "c1g5",
+      "h7h6",
+      "g5f6"
+    ],
+    "rating": 950,
+    "theme": [
+      "pin",
+      "pressure"
+    ],
+    "description": "Pin the knight defending the king",
+    "playerColor": "black"
+  },
+  {
+    "id": "ez12",
+    "fen": "rnbqkb1r/pppp1ppp/8/4p3/4n3/2N5/PPPP1PPP/R1BQKBNR w KQkq - 0 4",
+    "moves": [
+      "c3e4",
+      "d7d5",
+      "e4g3"
+    ],
+    "rating": 850,
+    "theme": [
+      "freePiece",
+      "capture"
+    ],
+    "description": "Capture the undefended knight",
+    "playerColor": "black"
+  },
+  {
+    "id": "ez13",
+    "fen": "r1bqk2r/pppp1ppp/2n5/4P3/1bB1n3/2N2N2/PPP2PPP/R1BQK2R w KQkq - 0 7",
+    "moves": [
+      "c4f7",
+      "e8f7",
+      "d1d5",
+      "f7e8",
+      "d5e4"
+    ],
+    "rating": 1150,
+    "theme": [
+      "fork",
+      "queenFork"
+    ],
+    "description": "Double attack on king and knight",
+    "playerColor": "black"
+  },
+  {
+    "id": "ez14",
+    "fen": "r1b1k2r/pppp1ppp/2n2q2/8/1b2P3/2N2N2/PPP1BPPP/R1BQK2R w KQkq - 2 8",
+    "moves": [
+      "c1d2",
+      "b4c3",
+      "d2c3"
+    ],
+    "rating": 900,
+    "theme": [
+      "pinBreak",
+      "skewer"
+    ],
+    "description": "Neutralize the pin and control the long diagonal",
+    "playerColor": "black"
+  },
+  {
+    "id": "ez15",
+    "fen": "r2qk2r/ppp2ppp/2n1bn2/3p4/1bPP4/2N2N2/PP1BBPPP/R2QK2R w KQkq - 5 9",
+    "moves": [
+      "c4d5",
+      "f6d5",
+      "c3d5",
+      "b4d2",
+      "d1d2"
+    ],
+    "rating": 1100,
+    "theme": [
+      "tacticalExchange",
+      "simplification"
+    ],
+    "description": "Liquidate into a favorable central position",
+    "playerColor": "black"
+  },
+  {
+    "id": "ez16",
+    "fen": "r1bqk2r/pppp1ppp/2n2n2/4p3/1bB1P3/2N2N2/PPPP1PPP/R1BQK2R w KQkq - 4 5",
+    "moves": [
+      "e1g1",
+      "b4c3",
+      "d2c3"
+    ],
+    "rating": 880,
+    "theme": [
+      "development",
+      "kingSafety"
+    ],
+    "description": "Castle safely out of the pin",
+    "playerColor": "black"
+  },
+  {
+    "id": "ez17",
+    "fen": "r1bq1rk1/pppp1ppp/2n2n2/2b1p3/2B1P3/2N2N2/PPPP1PPP/R1BQ1RK1 w - - 6 6",
+    "moves": [
+      "d2d3",
+      "d7d6",
+      "c1g5"
+    ],
+    "rating": 920,
+    "theme": [
+      "pin",
+      "initiative"
+    ],
+    "description": "Pin the enemy knight",
+    "playerColor": "black"
+  },
+  {
+    "id": "ez18",
+    "fen": "r2qkb1r/pp1n1ppp/2p1pn2/5b2/3P4/2N2NP1/PPP1QP1P/R1B1KB1R b KQkq - 1 7",
+    "moves": [
+      "f5c2",
+      "e2c2"
+    ],
+    "rating": 960,
+    "theme": [
+      "tacticalExchange",
+      "blunderPunish"
+    ],
+    "description": "Recapture the stray piece",
+    "playerColor": "white"
+  },
+  {
+    "id": "ez19",
+    "fen": "r1bqk2r/pp2bppp/2n1pn2/2pp4/3P4/2PBPN2/PP1N1PPP/R1BQK2R w KQkq - 3 7",
+    "moves": [
+      "d4c5",
+      "e7c5",
+      "e1g1"
+    ],
+    "rating": 890,
+    "theme": [
+      "pawnStructure",
+      "opening"
+    ],
+    "description": "Resolve tension and castle",
+    "playerColor": "black"
+  },
+  {
+    "id": "ez20",
+    "fen": "r1bq1rk1/ppp1bppp/2n1pn2/3p4/2PP4/2N1PN2/PP2BPPP/R1BQK2R w KQ - 3 7",
+    "moves": [
+      "c4d5",
+      "e6d5",
+      "e1g1"
+    ],
+    "rating": 910,
+    "theme": [
+      "simplification",
+      "control"
+    ],
+    "description": "Establish central stability",
+    "playerColor": "black"
+  },
+  {
+    "id": "med01",
+    "fen": "r1bqkb1r/pppp1ppp/2n5/4p3/2B1n3/5N2/PPPP1PPP/RNBQ1RK1 b kq - 1 4",
+    "moves": [
+      "d7d5",
+      "c4d5",
+      "d8d5"
+    ],
+    "rating": 1250,
+    "theme": [
+      "fork",
+      "centralFork"
+    ],
+    "description": "Fork the bishop and pawn to seize center",
+    "playerColor": "white"
+  },
+  {
+    "id": "med02",
+    "fen": "r1bqr1k1/ppp2ppp/2np4/2bNp3/2B1P3/3P1N2/PPP2PPP/R2Q1RK1 w - - 0 10",
+    "moves": [
+      "f3g5",
+      "d8g5",
+      "d5c7"
+    ],
+    "rating": 1350,
+    "theme": [
+      "sacrifice",
+      "royalFork"
+    ],
+    "description": "Distract the queen and fork both rooks",
+    "playerColor": "black"
+  },
+  {
+    "id": "med03",
+    "fen": "r1bq1rk1/pppn1ppp/3p1n2/4p3/2BPP3/2P2N2/P1P2PPP/R1BQ1RK1 w - - 1 8",
+    "moves": [
+      "d4e5",
+      "d6e5",
+      "c1a3"
+    ],
+    "rating": 1280,
+    "theme": [
+      "skewer",
+      "diagonalControl"
+    ],
+    "description": "Develop with tempo skewering rook and king diagonal",
+    "playerColor": "black"
+  },
+  {
+    "id": "med04",
+    "fen": "2r3k1/1p3ppp/pq2p3/3p4/1P1P4/P1r1P3/1Q3PPP/R4RK1 b - - 0 20",
+    "moves": [
+      "c3c2",
+      "b2b1",
+      "b6c7"
+    ],
+    "rating": 1300,
+    "theme": [
+      "outpost",
+      "seventhRank"
+    ],
+    "description": "Infiltrate the 7th rank with rook pressure",
+    "playerColor": "white"
+  },
+  {
+    "id": "med05",
+    "fen": "r4rk1/1pp2ppp/p1np4/4p3/2B1P1nq/2NP4/PPP2PPP/R2QR1K1 w - - 0 12",
+    "moves": [
+      "h2h3",
+      "h4f2",
+      "g1h1",
+      "f2g3",
+      "h3g4"
+    ],
+    "rating": 1450,
+    "theme": [
+      "defense",
+      "counterAttack"
+    ],
+    "description": "Trap the overextended attacker",
+    "playerColor": "black"
+  },
+  {
+    "id": "med06",
+    "fen": "r1b1r1k1/pp3ppp/2n5/2q5/2B5/4PN2/PPP3PP/R2QR1K1 w - - 0 14",
+    "moves": [
+      "c4f7",
+      "g8f7",
+      "d1d5",
+      "c5d5"
+    ],
+    "rating": 1400,
+    "theme": [
+      "decoy",
+      "deflection"
+    ],
+    "description": "Draw the king out with a sacrifice",
+    "playerColor": "black"
+  },
+  {
+    "id": "med07",
+    "fen": "r3k2r/pppq1ppp/2n1bn2/3p4/1bPP4/2N2N2/PP1BBPPP/R2QK2R w KQkq - 5 9",
+    "moves": [
+      "c4c5",
+      "b4c3",
+      "b2c3"
+    ],
+    "rating": 1250,
+    "theme": [
+      "spaceAdvantage",
+      "pawnChain"
+    ],
+    "description": "Lock the center and trap the bishop",
+    "playerColor": "black"
+  },
+  {
+    "id": "med08",
+    "fen": "r1bq1rk1/1pp2ppp/p1np1n2/2b1p3/2B1P3/2PP1N2/PP3PPP/RNBQ1RK1 w - - 0 8",
+    "moves": [
+      "c1g5",
+      "h7h6",
+      "g5h4",
+      "g7g5",
+      "h4g3"
+    ],
+    "rating": 1320,
+    "theme": [
+      "pin",
+      "weakeningMove"
+    ],
+    "description": "Force pawn weaknesses around opponent's king",
+    "playerColor": "black"
+  },
+  {
+    "id": "med09",
+    "fen": "r2qk2r/1pp1bppp/p1n1pn2/3p4/2PP4/2N1PN2/PPQ2PPP/R1B1K2R w KQkq - 2 9",
+    "moves": [
+      "c4d5",
+      "e6d5",
+      "c2b3"
+    ],
+    "rating": 1380,
+    "theme": [
+      "doubleAttack",
+      "pawnTarget"
+    ],
+    "description": "Create dual threats on b7 and d5",
+    "playerColor": "black"
+  },
+  {
+    "id": "med10",
+    "fen": "2r2rk1/pp1b1ppp/1q1bpn2/3p4/1P1P4/P1NBPN2/5PPP/R2Q1RK1 w - - 1 14",
+    "moves": [
+      "c3a4",
+      "b6d8",
+      "a4c5"
+    ],
+    "rating": 1420,
+    "theme": [
+      "outpost",
+      "tempoGain"
+    ],
+    "description": "Plant a monster knight on c5",
+    "playerColor": "black"
+  },
+  {
+    "id": "med11",
+    "fen": "r1b2rk1/pp2qppp/2n1pn2/3p4/2PP4/2NB1N2/PP3PPP/R2Q1RK1 w - - 0 11",
+    "moves": [
+      "c4d5",
+      "e6d5",
+      "f1e1"
+    ],
+    "rating": 1290,
+    "theme": [
+      "openFile",
+      "tempoOnQueen"
+    ],
+    "description": "Seize the open e-file with tempo on the queen",
+    "playerColor": "black"
+  },
+  {
+    "id": "med12",
+    "fen": "r2q1rk1/pp3ppp/2n1pn2/2bp4/8/2NBPN2/PPP2PPP/R2QK2R w KQ - 0 9",
+    "moves": [
+      "e1g1",
+      "e6e5",
+      "e3e4"
+    ],
+    "rating": 1360,
+    "theme": [
+      "centralBreak",
+      "harmony"
+    ],
+    "description": "Strike back in the center before opponent rolls forward",
+    "playerColor": "black"
+  },
+  {
+    "id": "med13",
+    "fen": "r1bqr1k1/ppp2ppp/2n5/3np3/2B5/3P1N2/PPP2PPP/R1BQR1K1 w - - 0 10",
+    "moves": [
+      "d3d4",
+      "e5e4",
+      "f3g5"
+    ],
+    "rating": 1480,
+    "theme": [
+      "forkThreat",
+      "tacticalLeverage"
+    ],
+    "description": "Exploit the pinned knight and loose e4 pawn",
+    "playerColor": "black"
+  },
+  {
+    "id": "med14",
+    "fen": "r1bqk2r/pp2bppp/2n1pn2/2pp4/2PP4/2N1PN2/PPQ2PPP/R1B1KB1R w KQkq - 2 7",
+    "moves": [
+      "c4d5",
+      "e6d5",
+      "d4c5",
+      "e7c5"
+    ],
+    "rating": 1270,
+    "theme": [
+      "isolatedQueenPawn",
+      "structure"
+    ],
+    "description": "Isolate the black d-pawn to create a long-term target",
+    "playerColor": "black"
+  },
+  {
+    "id": "med15",
+    "fen": "r1b1k2r/pp3ppp/2n1pn2/q1bp4/2PP4/2N2N2/PP1BBPPP/R2QK2R b KQkq - 2 9",
+    "moves": [
+      "c5d4",
+      "c3d5",
+      "a5d8",
+      "d5f6",
+      "d8f6"
+    ],
+    "rating": 1520,
+    "theme": [
+      "discoveredAttack",
+      "unpin"
+    ],
+    "description": "Navigate the complex tactical crossfire in the center",
+    "playerColor": "white"
+  },
+  {
+    "id": "hd01",
+    "fen": "r1b2rk1/pp3ppp/2n1p3/q7/3P4/2PB1N2/P4PPP/R2Q1RK1 w - - 0 13",
+    "moves": [
+      "d3h7",
+      "g8h7",
+      "f3g5",
+      "h7g8",
+      "d1h5"
+    ],
+    "rating": 1750,
+    "theme": [
+      "greekGift",
+      "kingHunt"
+    ],
+    "description": "Classic Greek Gift sacrifice tearing open the king",
+    "playerColor": "black"
+  },
+  {
+    "id": "hd02",
+    "fen": "r2q1rk1/1b2bppp/p1n1pn2/1p6/3P4/P1N1BN2/1P2BPPP/R2Q1RK1 w - - 0 13",
+    "moves": [
+      "d4d5",
+      "e6d5",
+      "c3d5",
+      "f6d5",
+      "d1d5"
+    ],
+    "rating": 1680,
+    "theme": [
+      "centralBreak",
+      "liquidation"
+    ],
+    "description": "Exploit opponent's piece placement with d5 break",
+    "playerColor": "black"
+  },
+  {
+    "id": "hd03",
+    "fen": "2r2rk1/1pqb1ppp/p2p1n2/4p3/1PPnP3/P1NB4/3N1PPP/R2Q1RK1 w - - 0 16",
+    "moves": [
+      "c3d5",
+      "f6d5",
+      "c4d5"
+    ],
+    "rating": 1620,
+    "theme": [
+      "positionalBlockade",
+      "outpost"
+    ],
+    "description": "Exchange the menacing knight and secure queenside control",
+    "playerColor": "black"
+  },
+  {
+    "id": "hd04",
+    "fen": "r3k2r/pbqn1ppp/1p1bpn2/2pp4/2PP4/1PN1PN2/PBQ1BPPP/R3K2R w KQkq - 2 10",
+    "moves": [
+      "c3b5",
+      "c7b8",
+      "b5d6",
+      "b8d6"
+    ],
+    "rating": 1650,
+    "theme": [
+      "bishopPair",
+      "weakSquares"
+    ],
+    "description": "Eliminate the vital dark-squared bishop",
+    "playerColor": "black"
+  },
+  {
+    "id": "hd05",
+    "fen": "r1b2rk1/pp1nbppp/2p1pn2/q5B1/2BP4/2N1PN2/PP3PPP/R2Q1RK1 w - - 3 10",
+    "moves": [
+      "a2a3",
+      "b7b5",
+      "b2b4",
+      "a5b6",
+      "c4d3"
+    ],
+    "rating": 1720,
+    "theme": [
+      "queensideExpansion",
+      "tempoGain"
+    ],
+    "description": "Drive back the black queen while gaining queenside territory",
+    "playerColor": "black"
+  },
+  {
+    "id": "hd06",
+    "fen": "2rq1rk1/pp1bppbp/3p1np1/8/2BNP3/2N1BP2/PPPQ2PP/2KR3R w - - 1 12",
+    "moves": [
+      "c4b3",
+      "a7a6",
+      "h2h4"
+    ],
+    "rating": 1780,
+    "theme": [
+      "oppositeSideCastling",
+      "yugoslavAttack"
+    ],
+    "description": "Launch the kingside pawn storm in the Sicilian Dragon",
+    "playerColor": "black"
+  },
+  {
+    "id": "hd07",
+    "fen": "r1bq1rk1/pp1n1pbp/2p1p1p1/3pP3/3P4/2N2NP1/PPP1Q1PP/R3KB1R w KQ - 1 10",
+    "moves": [
+      "e1c1",
+      "c6c5",
+      "d4c5",
+      "d7c5"
+    ],
+    "rating": 1640,
+    "theme": [
+      "castlingChoice",
+      "counterstrike"
+    ],
+    "description": "Choose long castling and contest the central pawn tension",
+    "playerColor": "black"
+  },
+  {
+    "id": "hd08",
+    "fen": "r2qk2r/pb1nbppp/1p2pn2/2pp4/2PP4/1PN1PN2/PB2BPPP/R2Q1RK1 w kq - 4 10",
+    "moves": [
+      "c4d5",
+      "e6d5",
+      "d4c5",
+      "b6c5",
+      "a1c1"
+    ],
+    "rating": 1700,
+    "theme": [
+      "hangingPawns",
+      "pressure"
+    ],
+    "description": "Create hanging pawns and immediately pressure c5 and d5",
+    "playerColor": "black"
+  },
+  {
+    "id": "hd09",
+    "fen": "2r2rk1/1pq1bppp/p2p1n2/4p3/2b1P3/P1N1B2P/1PP1BPP1/R2Q1RK1 w - - 0 16",
+    "moves": [
+      "e2c4",
+      "c7c4",
+      "d1d3"
+    ],
+    "rating": 1630,
+    "theme": [
+      "endgameTransition",
+      "pawnStructure"
+    ],
+    "description": "Trade active pieces and consolidate the central bind",
+    "playerColor": "black"
+  },
+  {
+    "id": "hd10",
+    "fen": "r1b2rk1/pp3ppp/2n1pn2/q1bp4/2PP4/2N2NP1/PP3PBP/R1BQ1RK1 w - - 1 10",
+    "moves": [
+      "d4c5",
+      "a5c5",
+      "c1e3"
+    ],
+    "rating": 1760,
+    "theme": [
+      "initiative",
+      "bishopDevelopment"
+    ],
+    "description": "Capture with tempo and seize dominating piece activity",
+    "playerColor": "black"
+  }
+]

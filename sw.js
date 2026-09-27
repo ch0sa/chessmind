@@ -1,5 +1,5 @@
 // ChessMind Service Worker - Offline caching
-const CACHE_NAME = 'chessmind-v20';
+const CACHE_NAME = 'chessmind-v21';
 const ASSETS = [
   '/',
   '/css/app.css',
@@ -18,6 +18,7 @@ const ASSETS = [
   '/lib/stockfish/stockfish.wasm.js',
   '/lib/stockfish/stockfish.wasm',
   '/lib/stockfish/stockfish.js',
+  '/data/puzzles.json',
   '/manifest.json',
 ];
 

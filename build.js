@@ -27,7 +27,7 @@ for (const file of filesToCopy) {
   }
 }
 
-const dirsToCopy = ['css', 'js', 'lib'];
+const dirsToCopy = ['css', 'js', 'lib', 'data'];
 for (const dir of dirsToCopy) {
   if (fs.existsSync(dir)) {
     copyRecursive(dir, path.join(distDir, dir));

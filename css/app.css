@@ -841,6 +841,12 @@ cg-board piece.dragging {
   background: var(--bg-app);
   border-radius: var(--radius-md);
   margin-bottom: 4px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.mode-selector-bar::-webkit-scrollbar {
+  display: none;
 }
 
 .mode-btn {

@@ -20,10 +20,20 @@ import { identifyOpening } from './openings.js';
 
 const state = {
   mode: 'analysis',          // 'setup' | 'analysis'
-  gameMode: 'analysis',      // 'analysis' | 'vs-computer' | 'local-1v1'
+  gameMode: 'analysis',      // 'analysis' | 'vs-computer' | 'local-1v1' | 'puzzles'
   playerColor: 'white',      // 'white' | 'black' (human player in vs-computer)
   difficulty: 3,             // 1-6 difficulty level
   isGameOver: false,
+  puzzle: {
+    list: [],
+    current: null,
+    moveIndex: 0,
+    streak: 0,
+    solvedCount: 0,
+    solved: false,
+    difficulty: 'medium',
+    playerColor: 'white',
+  },
   analysisPaused: false,     // True when user explicitly stopped analysis
   ground: null,           // Chessground instance
   chess: null,            // chess.js instance
@@ -245,6 +255,14 @@ function initDOM() {
   els.modeSelectorBtns = document.querySelectorAll('.mode-btn');
   els.vsComputerPanel = document.getElementById('vs-computer-panel');
   els.local1v1Panel = document.getElementById('local-1v1-panel');
+  els.puzzlePanel = document.getElementById('puzzle-panel');
+  els.puzzleStreak = document.getElementById('puzzle-streak');
+  els.puzzleSolved = document.getElementById('puzzle-solved');
+  els.puzzleThemeTag = document.getElementById('puzzle-theme-tag');
+  els.puzzlePrompt = document.getElementById('puzzle-prompt');
+  els.puzzleDifficulty = document.getElementById('puzzle-difficulty');
+  els.puzzleHintBtn = document.getElementById('puzzle-hint-btn');
+  els.puzzleNextBtn = document.getElementById('puzzle-next-btn');
   els.playAsColor = document.getElementById('play-as-color');
   els.difficultyLevel = document.getElementById('difficulty-level');
   els.timeControlVs = document.getElementById('time-control-vs');
@@ -486,6 +504,11 @@ function handleBoardMove(orig, dest) {
         speak(formatMoveForSpeech(move.san, move.piece, move.from, move.to, move.flags));
       }
 
+      if (state.gameMode === 'puzzles') {
+        handlePuzzleUserMove(orig, dest, move);
+        return;
+      }
+
       if (state.gameMode === 'vs-computer') {
         updateGameStatus();
         if (!state.isGameOver) {
@@ -496,6 +519,11 @@ function handleBoardMove(orig, dest) {
 
       if (state.gameMode === 'local-1v1') {
         updateGameStatus();
+        setTimeout(() => {
+          if (state.ground && typeof state.ground.playPremove === 'function') {
+            state.ground.playPremove();
+          }
+        }, 120);
         return;
       }
       
@@ -608,6 +636,11 @@ function handleMoveExecution(parsed) {
           speak(formatMoveForSpeech(move.san, move.piece, move.from, move.to, move.flags));
         }
 
+        if (state.gameMode === 'puzzles') {
+          handlePuzzleUserMove(move.from, move.to, move);
+          return;
+        }
+
         if (state.gameMode === 'vs-computer') {
           updateGameStatus();
           if (!state.isGameOver) {
@@ -618,6 +651,11 @@ function handleMoveExecution(parsed) {
 
         if (state.gameMode === 'local-1v1') {
           updateGameStatus();
+          setTimeout(() => {
+            if (state.ground && typeof state.ground.playPremove === 'function') {
+              state.ground.playPremove();
+            }
+          }, 120);
           return;
         }
 
@@ -901,15 +939,21 @@ function updateAnalysisUI(result) {
     });
   }
 
-  // Draw arrow for best move
-  if (result.bestMove && state.ground) {
-    const move = parseUCIMove(result.bestMove);
-    if (move && /^[a-h][1-8]$/.test(move.from) && /^[a-h][1-8]$/.test(move.to)) {
-      state.ground.setAutoShapes([{
-        orig: move.from,
-        dest: move.to,
-        brush: 'green',
-      }]);
+  // Phase 4: Draw dynamic evaluation arrow for best move / current PV in analysis mode
+  if (state.ground && state.mode === 'analysis' && state.gameMode === 'analysis') {
+    const primaryLine = result.lines && result.lines[0];
+    const bestUci = result.bestMove || (primaryLine && primaryLine.pv && primaryLine.pv[0]);
+    if (bestUci) {
+      const move = parseUCIMove(bestUci);
+      if (move && /^[a-h][1-8]$/.test(move.from) && /^[a-h][1-8]$/.test(move.to) && move.from !== move.to) {
+        state.ground.setAutoShapes([{
+          orig: move.from,
+          dest: move.to,
+          brush: 'green',
+        }]);
+      } else {
+        state.ground.setAutoShapes([]);
+      }
     } else {
       state.ground.setAutoShapes([]);
     }
@@ -967,6 +1011,14 @@ function onBestMove(result) {
           if (isTTSEnabled()) {
             speak(`Computer plays ${result.bestMove}`);
           }
+
+          // Phase 6: Premove execution hook - trigger premove if user queued one
+          setTimeout(() => {
+            if (state.ground && typeof state.ground.playPremove === 'function') {
+              state.ground.playPremove();
+            }
+          }, 120);
+
           return;
         }
       }
@@ -1091,6 +1143,10 @@ function updatePlayerStripsUI() {
       els.topPlayerName.textContent = isComputerTop ? `Stockfish (Lvl ${state.difficulty})` : 'You';
       if (els.topPlayerIcon) els.topPlayerIcon.textContent = isComputerTop ? '🤖' : '👤';
       if (els.topPlayerBadge) els.topPlayerBadge.textContent = topColor === 'white' ? 'White' : 'Black';
+    } else if (state.gameMode === 'puzzles') {
+      els.topPlayerName.textContent = 'Tactics Trainer';
+      if (els.topPlayerIcon) els.topPlayerIcon.textContent = '🧩';
+      if (els.topPlayerBadge) els.topPlayerBadge.textContent = topColor === 'white' ? 'White' : 'Black';
     } else if (state.gameMode === 'local-1v1') {
       els.topPlayerName.textContent = topColor === 'white' ? 'White' : 'Black';
       if (els.topPlayerIcon) els.topPlayerIcon.textContent = topColor === 'white' ? '♔' : '♚';
@@ -1107,6 +1163,10 @@ function updatePlayerStripsUI() {
       const isComputerBottom = (state.playerColor === 'black' && !isFlipped) || (state.playerColor === 'white' && isFlipped);
       els.bottomPlayerName.textContent = isComputerBottom ? `Stockfish (Lvl ${state.difficulty})` : 'You';
       if (els.bottomPlayerIcon) els.bottomPlayerIcon.textContent = isComputerBottom ? '🤖' : '👤';
+      if (els.bottomPlayerBadge) els.bottomPlayerBadge.textContent = bottomColor === 'white' ? 'White' : 'Black';
+    } else if (state.gameMode === 'puzzles') {
+      els.bottomPlayerName.textContent = 'You';
+      if (els.bottomPlayerIcon) els.bottomPlayerIcon.textContent = '👤';
       if (els.bottomPlayerBadge) els.bottomPlayerBadge.textContent = bottomColor === 'white' ? 'White' : 'Black';
     } else if (state.gameMode === 'local-1v1') {
       els.bottomPlayerName.textContent = bottomColor === 'white' ? 'White' : 'Black';
@@ -1681,6 +1741,7 @@ function switchGameMode(mode) {
   // Show/hide mode panels
   if (els.vsComputerPanel) els.vsComputerPanel.classList.toggle('hidden', mode !== 'vs-computer');
   if (els.local1v1Panel) els.local1v1Panel.classList.toggle('hidden', mode !== 'local-1v1');
+  if (els.puzzlePanel) els.puzzlePanel.classList.toggle('hidden', mode !== 'puzzles');
 
   // Show/hide analysis-specific HUD controls
   const analysisOnlyEls = [els.analyzeBtn, els.stopBtn, els.depthDisplay];
@@ -1690,7 +1751,7 @@ function switchGameMode(mode) {
 
   // Show/hide game status bar
   if (els.gameStatusBar) {
-    els.gameStatusBar.classList.toggle('hidden', mode === 'analysis');
+    els.gameStatusBar.classList.toggle('hidden', mode === 'analysis' || mode === 'puzzles');
   }
 
   // Show/hide editing controls (palette, free move, clear board, candidate lines, voice bar)
@@ -1730,6 +1791,13 @@ function switchGameMode(mode) {
     startNewGame('vs-computer');
   } else if (mode === 'local-1v1') {
     startNewGame('local-1v1');
+  } else if (mode === 'puzzles') {
+    stopAnalysis();
+    updateAnalysisButtonUI(false);
+    stopClock();
+    state.clock.enabled = false;
+    updateClockUI();
+    loadAndStartPuzzle(els.puzzleDifficulty ? els.puzzleDifficulty.value : 'all');
   }
 }
 
@@ -1814,6 +1882,225 @@ function startNewGame(mode) {
   }
 
   showToast('New game started!', 'success', 2000);
+}
+
+// ==========================================================================
+// Tactical Puzzles Engine (Phase 5)
+// ==========================================================================
+
+async function fetchPuzzles() {
+  if (state.puzzle.list && state.puzzle.list.length > 0) return state.puzzle.list;
+  try {
+    const res = await fetch('/data/puzzles.json');
+    if (res.ok) {
+      const data = await res.json();
+      state.puzzle.list = data;
+      return data;
+    }
+  } catch (e) {
+    console.warn('Failed to load puzzles.json:', e);
+  }
+  return [];
+}
+
+async function loadAndStartPuzzle(prefDifficulty = 'all') {
+  const list = await fetchPuzzles();
+  if (!list || list.length === 0) {
+    showToast('Puzzles database unavailable offline', 'error');
+    if (els.puzzlePrompt) els.puzzlePrompt.textContent = 'Could not load puzzles.';
+    return;
+  }
+
+  let filtered = list;
+  if (prefDifficulty === 'easy') {
+    filtered = list.filter(p => p.rating < 1200);
+  } else if (prefDifficulty === 'medium') {
+    filtered = list.filter(p => p.rating >= 1200 && p.rating < 1600);
+  } else if (prefDifficulty === 'hard') {
+    filtered = list.filter(p => p.rating >= 1600);
+  }
+  if (!filtered || filtered.length === 0) filtered = list;
+
+  const puzzle = filtered[Math.floor(Math.random() * filtered.length)];
+  state.puzzle.current = puzzle;
+  state.puzzle.moveIndex = 0;
+  state.puzzle.solved = false;
+  state.puzzle.playerColor = puzzle.playerColor || 'white';
+  state.isGameOver = false;
+
+  // Initialize board with starting FEN
+  state.chess = new Chess(puzzle.fen);
+  state.currentFen = puzzle.fen;
+  state.boardOrientation = state.puzzle.playerColor;
+  state.historyMoves = [];
+  state.currentHistoryIndex = -1;
+  renderMoveHistoryUI();
+  updatePlayerStripsUI();
+  updateOpeningUI();
+
+  if (els.puzzleThemeTag) {
+    const tag = (puzzle.theme && puzzle.theme[0]) ? puzzle.theme[0].toUpperCase() : 'TACTIC';
+    els.puzzleThemeTag.textContent = `${tag} (${puzzle.rating})`;
+  }
+  if (els.puzzleStreak) els.puzzleStreak.textContent = state.puzzle.streak;
+  if (els.puzzleSolved) els.puzzleSolved.textContent = state.puzzle.solvedCount;
+  if (els.puzzlePrompt) els.puzzlePrompt.innerHTML = 'Opponent is making a move...';
+
+  // Set initial board state
+  state.ground.setAutoShapes([]);
+  state.ground.set({
+    orientation: state.puzzle.playerColor,
+    fen: state.currentFen,
+    turnColor: state.chess.turn() === 'w' ? 'white' : 'black',
+    lastMove: null,
+    movable: {
+      free: false,
+      color: undefined,
+      dests: new Map(),
+      showDests: false,
+    },
+    events: { move: handleBoardMove, select: handleBoardSelect },
+  });
+
+  // Play opponent's blunder / setup move after 400ms
+  setTimeout(() => {
+    if (state.gameMode !== 'puzzles' || state.puzzle.current !== puzzle) return;
+    const blunder = puzzle.moves[0];
+    const from = blunder.slice(0, 2);
+    const to = blunder.slice(2, 4);
+    const promotion = blunder.slice(4) || undefined;
+    const move = state.chess.move({ from, to, promotion });
+    if (move) {
+      state.currentFen = state.chess.fen();
+      state.puzzle.moveIndex = 1;
+
+      state.ground.set({
+        fen: state.currentFen,
+        lastMove: [from, to],
+        turnColor: state.puzzle.playerColor,
+        movable: {
+          free: false,
+          color: state.puzzle.playerColor,
+          dests: getLegalMoves(),
+          showDests: true,
+        },
+      });
+
+      playMoveSoundFx(move);
+      recordMoveInHistory(move);
+      updatePlayerStripsUI();
+
+      const colorName = state.puzzle.playerColor === 'white' ? 'White' : 'Black';
+      if (els.puzzlePrompt) {
+        els.puzzlePrompt.innerHTML = `Your turn (${colorName}) — <strong>Find the best move!</strong>`;
+      }
+    }
+  }, 400);
+}
+
+function handlePuzzleUserMove(orig, dest, move) {
+  if (!state.puzzle.current || state.puzzle.solved) return;
+
+  const expectedUci = state.puzzle.current.moves[state.puzzle.moveIndex];
+  const userUci = orig + dest + (move.promotion || '');
+
+  // Compare user move with expected move (handling promotions if present)
+  const isMatch = (userUci === expectedUci) || 
+                  (expectedUci && expectedUci.length === 4 && userUci.slice(0, 4) === expectedUci);
+
+  if (isMatch) {
+    state.puzzle.moveIndex++;
+
+    // Check if entire puzzle is solved!
+    if (state.puzzle.moveIndex >= state.puzzle.current.moves.length) {
+      state.puzzle.solved = true;
+      state.puzzle.streak++;
+      state.puzzle.solvedCount++;
+
+      if (els.puzzleStreak) els.puzzleStreak.textContent = state.puzzle.streak;
+      if (els.puzzleSolved) els.puzzleSolved.textContent = state.puzzle.solvedCount;
+      if (els.puzzlePrompt) {
+        els.puzzlePrompt.innerHTML = '🎉 <span style="color: var(--accent-emerald); font-weight: bold;">Puzzle Solved! Great job!</span>';
+      }
+
+      showToast(`Puzzle Solved! Streak: ${state.puzzle.streak} 🔥`, 'success', 2500);
+      playGameEndSound();
+
+      // Disable further moves on the solved position
+      state.ground.set({
+        movable: { free: false, color: undefined, dests: new Map() }
+      });
+      return;
+    }
+
+    // Intermediate correct move: play opponent's reply
+    if (els.puzzlePrompt) {
+      els.puzzlePrompt.innerHTML = '✨ <span style="color: #60a5fa;">Good move! Playing opponent response...</span>';
+    }
+
+    const oppUci = state.puzzle.current.moves[state.puzzle.moveIndex];
+    state.puzzle.moveIndex++;
+
+    setTimeout(() => {
+      if (state.gameMode !== 'puzzles') return;
+      const oppFrom = oppUci.slice(0, 2);
+      const oppTo = oppUci.slice(2, 4);
+      const oppProm = oppUci.slice(4) || undefined;
+      const oppMove = state.chess.move({ from: oppFrom, to: oppTo, promotion: oppProm });
+      if (oppMove) {
+        state.currentFen = state.chess.fen();
+        state.ground.set({
+          fen: state.currentFen,
+          lastMove: [oppFrom, oppTo],
+          turnColor: state.puzzle.playerColor,
+          movable: {
+            free: false,
+            color: state.puzzle.playerColor,
+            dests: getLegalMoves(),
+            showDests: true,
+          },
+        });
+        playMoveSoundFx(oppMove);
+        recordMoveInHistory(oppMove);
+        updatePlayerStripsUI();
+
+        const colorName = state.puzzle.playerColor === 'white' ? 'White' : 'Black';
+        if (els.puzzlePrompt) {
+          els.puzzlePrompt.innerHTML = `Your turn (${colorName}) — <strong>Continue the tactic!</strong>`;
+        }
+      }
+    }, 450);
+  } else {
+    // Incorrect move: undo on chess.js and snap piece back
+    state.chess.undo();
+    state.currentFen = state.chess.fen();
+    state.ground.set({
+      fen: state.currentFen,
+      turnColor: state.puzzle.playerColor,
+      movable: {
+        free: false,
+        color: state.puzzle.playerColor,
+        dests: getLegalMoves(),
+        showDests: true,
+      },
+    });
+
+    state.puzzle.streak = 0;
+    if (els.puzzleStreak) els.puzzleStreak.textContent = '0';
+    if (els.puzzlePrompt) {
+      els.puzzlePrompt.innerHTML = '❌ <span style="color: #ef4444; font-weight: bold;">Incorrect move. Try again!</span>';
+    }
+    showToast('Not the best move. Try again!', 'warning', 2000);
+  }
+}
+
+function showPuzzleHint() {
+  if (state.gameMode !== 'puzzles' || !state.puzzle.current || state.puzzle.solved) return;
+  const expected = state.puzzle.current.moves[state.puzzle.moveIndex];
+  if (!expected) return;
+  const fromSquare = expected.slice(0, 2);
+  state.ground.setAutoShapes([{ orig: fromSquare, brush: 'yellow' }]);
+  showToast(`Hint: Move the piece on ${fromSquare.toUpperCase()}`, 'info', 2500);
 }
 
 function updateGameStatus() {
@@ -1946,6 +2233,26 @@ function getLegalMoves() {
 }
 
 function bindEvents() {
+  // Prevent context menu on board to enable right-click drawing (arrows and circles)
+  if (els.board) {
+    els.board.addEventListener('contextmenu', (e) => e.preventDefault());
+  }
+
+  // Puzzle Mode Events
+  if (els.puzzleHintBtn) {
+    els.puzzleHintBtn.addEventListener('click', showPuzzleHint);
+  }
+  if (els.puzzleNextBtn) {
+    els.puzzleNextBtn.addEventListener('click', () => {
+      loadAndStartPuzzle(els.puzzleDifficulty ? els.puzzleDifficulty.value : 'all');
+    });
+  }
+  if (els.puzzleDifficulty) {
+    els.puzzleDifficulty.addEventListener('change', (e) => {
+      loadAndStartPuzzle(e.target.value);
+    });
+  }
+
   // Game Mode Selector
   if (els.modeSelectorBtns) {
     els.modeSelectorBtns.forEach(btn => {
@@ -2592,6 +2899,17 @@ async function init() {
         autoDistance: true,
         showGhost: true,
         deleteOnDropOff: false
+      },
+      drawable: {
+        enabled: true,
+        visible: true,
+        defaultSnapToValidMove: true,
+        eraseOnClick: true
+      },
+      premovable: {
+        enabled: true,
+        showDests: true,
+        castle: true
       },
       selectable: { enabled: true },
       animation: { enabled: true, duration: 180 },
