@@ -289,6 +289,8 @@ function initDOM() {
   els.commandSubmitBtn = document.getElementById('command-submit-btn');
   els.pttBtn = document.getElementById('ptt-btn');
   els.freeModeBtn = document.getElementById('free-mode-btn');
+  els.freeMode1v1Btn = document.getElementById('free-mode-1v1-btn');
+  els.scrollCue = document.getElementById('scroll-cue');
 
   // Help & Guide Modal
   els.helpBtn = document.getElementById('help-btn');
@@ -455,7 +457,16 @@ function handleBoardMove(orig, dest) {
         movable: { free: true, color: 'both', dests: new Map() }
       });
       if (els.fenInput) els.fenInput.value = state.currentFen;
-      triggerDebouncedAnalysis(250);
+      
+      playMoveSoundFx({ color: piece.color });
+      updatePlayerStripsUI();
+      if (state.clock.enabled && !state.isGameOver) {
+        const movedColor = piece.color === 'w' ? 'white' : 'black';
+        switchClockTurn(activeColor, movedColor);
+      }
+      if (state.gameMode === 'analysis') {
+        triggerDebouncedAnalysis(250);
+      }
       showToast(`Moved ${orig} to ${dest}`, 'info', 1000);
     } else {
       state.ground.set({ fen: state.currentFen });
@@ -696,7 +707,14 @@ function handleMoveExecution(parsed) {
         });
         if (els.fenInput) els.fenInput.value = state.currentFen;
         showToast(`Moved ${parsed.from} to ${parsed.to}`, 'success', 1500);
-        if (state.engineReady) {
+
+        playMoveSoundFx({ color: piece.color });
+        updatePlayerStripsUI();
+        if (state.clock.enabled && !state.isGameOver) {
+          const movedColor = piece.color === 'w' ? 'white' : 'black';
+          switchClockTurn(activeColor, movedColor);
+        }
+        if (state.gameMode === 'analysis' && state.engineReady) {
           startAnalysis(state.currentFen, {
             depth: state.settings.depth,
             multiPV: state.settings.multiPV,
@@ -1759,10 +1777,22 @@ function switchGameMode(mode) {
   const paletteControls = document.querySelector('.piece-palette-deck');
   const candidatePanel = document.querySelector('.candidate-moves-panel');
   const voiceBar = document.querySelector('.voice-type-bar');
-  if (editControls) editControls.style.display = mode === 'analysis' ? '' : 'none';
+  if (editControls) editControls.style.display = (mode === 'analysis' || mode === 'local-1v1') ? '' : 'none';
   if (paletteControls) paletteControls.style.display = mode === 'analysis' ? '' : 'none';
   if (candidatePanel) candidatePanel.style.display = mode === 'analysis' ? '' : 'none';
-  if (voiceBar) voiceBar.style.display = mode === 'analysis' ? '' : 'none';
+  if (voiceBar) voiceBar.style.display = (mode === 'analysis' || mode === 'local-1v1') ? '' : 'none';
+
+  // If entering vs-computer or puzzles, disable free placement to avoid breaking engine/puzzle rules
+  if (mode === 'vs-computer' || mode === 'puzzles') {
+    if (state.freePlacement) {
+      state.freePlacement = false;
+      const btns = [els.freeModeBtn, els.freeMode1v1Btn].filter(Boolean);
+      btns.forEach(btn => {
+        btn.classList.remove('active');
+        btn.textContent = '✋ Free Move: OFF';
+      });
+    }
+  }
 
   updatePlayerStripsUI();
 
@@ -1863,7 +1893,11 @@ function startNewGame(mode) {
       fen: state.chess.fen(),
       turnColor: 'white',
       lastMove: null,
-      movable: {
+      movable: state.freePlacement ? {
+        free: true,
+        color: 'both',
+        dests: new Map(),
+      } : {
         free: false,
         color: 'white',
         dests: getLegalMoves(),
@@ -2719,41 +2753,68 @@ function bindEvents() {
   window.addEventListener('resize', debouncedResize, { passive: true });
   window.addEventListener('orientationchange', () => setTimeout(debouncedResize, 100), { passive: true });
 
+  // Native ResizeObserver for aspect-ratio responsive board scaling
+  if (window.ResizeObserver && els.board) {
+    const ro = new ResizeObserver(() => {
+      if (state.ground) state.ground.redrawAll();
+    });
+    ro.observe(els.board);
+  }
 
-  // Free Placement Mode Toggle
+  // Unified Free Placement Mode Toggle (for Analysis & 1v1 Local modes)
+  function toggleFreePlacementMode() {
+    state.freePlacement = !state.freePlacement;
+    const activeColor = state.chess.turn() === 'w' ? 'white' : 'black';
+    const btns = [els.freeModeBtn, els.freeMode1v1Btn].filter(Boolean);
+    if (state.freePlacement) {
+      btns.forEach(btn => {
+        btn.classList.add('active');
+        btn.textContent = '✋ Free Move: ON';
+      });
+      state.ground.set({
+        turnColor: activeColor,
+        movable: { free: true, color: 'both', dests: new Map() },
+        events: {
+          move: handleBoardMove,
+          select: handleBoardSelect
+        }
+      });
+      showToast('Free Move: ON (Move any piece anywhere)', 'info', 2000);
+    } else {
+      btns.forEach(btn => {
+        btn.classList.remove('active');
+        btn.textContent = '✋ Free Move: OFF';
+      });
+      state.ground.set({
+        turnColor: activeColor,
+        movable: { 
+          free: false, 
+          color: (state.gameMode === 'vs-computer') ? (state.isGameOver ? undefined : state.playerColor) : activeColor, 
+          dests: state.isGameOver ? new Map() : getLegalMoves(),
+          showDests: true
+        },
+        events: {
+          move: handleBoardMove,
+          select: handleBoardSelect
+        }
+      });
+      showToast(`Standard Rules: ON (${activeColor} to move)`, 'info', 2000);
+    }
+  }
+
   if (els.freeModeBtn) {
-    els.freeModeBtn.addEventListener('click', () => {
-      state.freePlacement = !state.freePlacement;
-      const activeColor = state.chess.turn() === 'w' ? 'white' : 'black';
-      if (state.freePlacement) {
-        els.freeModeBtn.classList.add('active');
-        els.freeModeBtn.textContent = '✋ Free Move: ON';
-        state.ground.set({
-          turnColor: activeColor,
-          movable: { free: true, color: 'both', dests: new Map() },
-          events: {
-            move: handleBoardMove,
-            select: handleBoardSelect
-          }
-        });
-        showToast('Free Move: ON (Move any piece anywhere)', 'info', 2000);
-      } else {
-        els.freeModeBtn.classList.remove('active');
-        els.freeModeBtn.textContent = '✋ Free Move: OFF';
-        state.ground.set({
-          turnColor: activeColor,
-          movable: { 
-            free: false, 
-            color: activeColor, 
-            dests: getLegalMoves(),
-            showDests: true
-          },
-          events: {
-            move: handleBoardMove,
-            select: handleBoardSelect
-          }
-        });
-        showToast(`Standard Rules: ON (${activeColor} to move)`, 'info', 2000);
+    els.freeModeBtn.addEventListener('click', toggleFreePlacementMode);
+  }
+  if (els.freeMode1v1Btn) {
+    els.freeMode1v1Btn.addEventListener('click', toggleFreePlacementMode);
+  }
+
+  // Scroll cue click: smoothly scroll down to controls
+  if (els.scrollCue) {
+    els.scrollCue.addEventListener('click', () => {
+      const controls = document.querySelector('.unified-controls-card');
+      if (controls) {
+        controls.scrollIntoView({ behavior: 'smooth' });
       }
     });
   }

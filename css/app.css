@@ -35,10 +35,29 @@
   --radius-lg: 16px;
   --radius-full: 9999px;
   
-  --header-height: 54px;
+  --header-height: 50px;
   --dock-height: 60px;
   
-  --board-max-width: min(calc(100vw - 24px), 480px);
+  /* Dynamic Aspect-Ratio Responsive Board Sizing:
+     In portrait (width is the limiting constraint), board spans the viewport width */
+  --board-size: min(calc(100vw - 16px), calc(100dvh - var(--header-height) - 140px));
+  --board-max-width: var(--board-size);
+}
+
+/* Square, Tablets & Landscape Displays (Height is the limiting constraint) */
+@media (min-aspect-ratio: 1/1) {
+  :root {
+    --board-size: min(calc(100vw - 32px), calc(100dvh - var(--header-height) - 110px), 820px);
+    --board-max-width: var(--board-size);
+  }
+}
+
+/* Large Desktop screens (1200px+) */
+@media (min-width: 1200px) and (min-aspect-ratio: 1/1) {
+  :root {
+    --board-size: min(calc(100vw - 48px), calc(100dvh - var(--header-height) - 110px), 850px);
+    --board-max-width: var(--board-size);
+  }
 }
 
 [data-theme="light"] {
@@ -203,12 +222,15 @@ button {
    ========================================================================== */
 
 .board-container-card {
-  width: 100%;
-  max-width: var(--board-max-width);
+  width: var(--board-size);
+  max-width: 100%;
+  min-height: calc(100dvh - var(--header-height) - 16px);
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  justify-content: center;
+  gap: 8px;
+  flex-shrink: 0;
 }
 
 .board-wrapper {
@@ -758,17 +780,51 @@ cg-board piece.dragging {
    ========================================================================== */
 
 .single-screen-layout {
-  padding: 12px 12px 24px 12px;
-  gap: 14px;
+  padding: 8px 8px 36px 8px;
+  gap: 16px;
+  align-items: center;
+  width: 100%;
 }
 
 .unified-controls-card {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  width: 100%;
-  max-width: var(--board-max-width);
+  width: var(--board-size);
+  max-width: 100%;
   margin: 0 auto;
+}
+
+/* Subtle scroll cue under board container */
+.scroll-cue {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 0.74rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  padding: 4px 0 2px 0;
+  cursor: pointer;
+  opacity: 0.75;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.scroll-cue:hover {
+  opacity: 1;
+  color: var(--accent-emerald);
+}
+
+.scroll-cue .cue-arrow {
+  display: inline-block;
+  font-size: 0.85rem;
+  animation: bounceDown 1.8s infinite ease-in-out;
+}
+
+@keyframes bounceDown {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(3px); }
 }
 
 .quick-actions-bar {

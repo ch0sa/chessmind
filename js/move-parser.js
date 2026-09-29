@@ -197,10 +197,13 @@ function matchMove(text) {
         return { san: 'O-O-O' };
     }
 
-    // Prepare text for regex matching by handling 'to' optionally
-    const t = text.replace(/\bto\b/g, ' ').replace(/\s+/g, ' ').trim();
+    // Strip optional leading "move" or "play" for natural spoken phrases like "move b8 to e5" or "play e4"
+    const withoutLead = text.replace(/^(?:move|play)\s+/i, '');
 
-    // 2. Square to square: "c2 to c5" -> "c2 c5", "e2 e4", "from c2 to c5"
+    // Prepare text for regex matching by handling 'to' optionally
+    const t = withoutLead.replace(/\bto\b/g, ' ').replace(/\s+/g, ' ').trim();
+
+    // 2. Square to square: "c2 to c5" -> "c2 c5", "e2 e4", "from c2 to c5", "move b8 to e5"
     let m = t.match(new RegExp(`^(?:from\\s+)?${sq}\\s+${sq}${ending}$`));
     if (m) {
         return { from: m[1], to: m[2], san: null };

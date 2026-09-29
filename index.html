@@ -166,6 +166,11 @@
                         <button id="new-game-again-btn" class="action-btn btn-sm" style="display: none;">🔄 New Game</button>
                     </div>
                 </div>
+
+                <!-- Scroll down cue for controls -->
+                <div class="scroll-cue" id="scroll-cue" role="button" aria-label="Scroll down for controls" title="Scroll down for controls">
+                    <span>Scroll for controls & analysis</span> <span class="cue-arrow">↓</span>
+                </div>
             </section>
 
             <!-- 2. Controls & Actions Section -->
@@ -262,6 +267,12 @@
                                 <option value="30|0">30 min (30|0)</option>
                             </optgroup>
                         </select>
+                    </div>
+                    <div class="setting-row compact" style="margin-bottom: 8px;">
+                        <label for="free-mode-1v1-btn">Free Move (Rules Off)</label>
+                        <button type="button" id="free-mode-1v1-btn" class="action-btn toggle-free" style="padding: 6px 12px; font-size: 0.82rem;">
+                            ✋ Free Move: OFF
+                        </button>
                     </div>
                     <button id="new-1v1-btn" class="action-btn btn-primary" style="width: 100%;">
                         ▶ New 1v1 Game
